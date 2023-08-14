@@ -23,6 +23,7 @@ using System.Net.NetworkInformation;
 using System.Net;
 using System.DirectoryServices;
 using System.DirectoryServices.ActiveDirectory;
+using System.Linq;
 
 namespace evilsqlclient
 {
@@ -31,7 +32,18 @@ namespace evilsqlclient
         public static void Main(string[] args)
         {
             // Run console
-            EvilCommands.RunSQLConsole();
+            if (0 == args.Length) { while (EvilCommands.RunSQLConsole(string.Empty)) { } }
+
+            args.ToList().ForEach(i =>
+            {
+#if DEBUG
+                Console.WriteLine($"[D] {i}");
+#endif
+                i.Split(new string[] { "|" }, StringSplitOptions.RemoveEmptyEntries).ToList().ForEach(j =>
+                {
+                    EvilCommands.RunSQLConsole(j.Trim());
+                });
+            });
         }
 
         public class EvilCommands
@@ -48,7 +60,7 @@ namespace evilsqlclient
             public static string UsernameG = "";
             public static string UsertypeG = "CurrentWindowsUser";
             public static string PasswordG = "";
-            public static string ReadyforQueryG = "no";
+            public static bool ReadyforQueryG = false;
             public static string ExportFileStateG = "disabled";
             public static string ExportFilePathG = "c:\\windows\\temp\\output.csv";
             public static string HttpStateG = "disabled";
@@ -571,7 +583,7 @@ namespace evilsqlclient
             public static string ListDatabase()
             {
                 CheckQueryReady();
-                if (ReadyforQueryG.Equals("yes"))
+                if (ReadyforQueryG)
                 {
                     // Create data table 
                     IList<string> TargetList = new List<string>();
@@ -687,7 +699,7 @@ namespace evilsqlclient
             public static string ListTable()
             {
                 CheckQueryReady();
-                if (ReadyforQueryG.Equals("yes"))
+                if (ReadyforQueryG)
                 {
                     // Create data table 
                     IList<string> TargetList = new List<string>();
@@ -810,7 +822,7 @@ namespace evilsqlclient
             public static string ListLinks()
             {
                 CheckQueryReady();
-                if (ReadyforQueryG.Equals("yes"))
+                if (ReadyforQueryG)
                 {
                     // Create data table 
                     IList<string> TargetList = new List<string>();
@@ -931,7 +943,7 @@ namespace evilsqlclient
             public static string CheckUncPathInjection(string attackerip)
             {
                 CheckQueryReady();
-                if (ReadyforQueryG.Equals("yes"))
+                if (ReadyforQueryG)
                 {
                     // Create data table 
                     IList<string> TargetList = new List<string>();
@@ -1008,7 +1020,7 @@ namespace evilsqlclient
             public static string ListRoleMembers()
             {
                 CheckQueryReady();
-                if (ReadyforQueryG.Equals("yes"))
+                if (ReadyforQueryG)
                 {
                     // Create data table 
                     IList<string> TargetList = new List<string>();
@@ -1103,7 +1115,7 @@ namespace evilsqlclient
             public static string ListPrivs()
             {
                 CheckQueryReady();
-                if (ReadyforQueryG.Equals("yes"))
+                if (ReadyforQueryG)
                 {
                     // Create data table 
                     IList<string> TargetList = new List<string>();
@@ -1214,7 +1226,7 @@ namespace evilsqlclient
             public static string ListServerInfo()
             {
                 CheckQueryReady();
-                if (ReadyforQueryG.Equals("yes"))
+                if (ReadyforQueryG)
                 {
                     // Create data table 
                     IList<string> TargetList = new List<string>();
@@ -1476,7 +1488,7 @@ namespace evilsqlclient
             public static string CheckLoginAsPw()
             {
                 CheckQueryReady();
-                if (ReadyforQueryG.Equals("yes"))
+                if (ReadyforQueryG)
                 {
                     // Create data table 
                     IList<string> TargetList = new List<string>();
@@ -1667,7 +1679,7 @@ namespace evilsqlclient
             public static string ListLogins()
             {
                 CheckQueryReady();
-                if (ReadyforQueryG.Equals("yes"))
+                if (ReadyforQueryG)
                 {
                     // Create data table 
                     IList<string> TargetList = new List<string>();
@@ -1762,7 +1774,7 @@ namespace evilsqlclient
             public static string CheckAccess()
             {
                 CheckQueryReady();
-                if (ReadyforQueryG.Equals("yes"))
+                if (ReadyforQueryG)
                 {
                     // Create data table 
                     IList<string> TargetList = new List<string>();
@@ -1924,7 +1936,7 @@ namespace evilsqlclient
             public static string CheckDefaultAppPw()
             {
                 CheckQueryReady();
-                if (ReadyforQueryG.Equals("yes"))
+                if (ReadyforQueryG)
                 {
                     // Create list 
                     IList<string> TargetList = new List<string>();
@@ -2186,7 +2198,7 @@ namespace evilsqlclient
             public static string RunOsCmd(string command)
             {
                 CheckQueryReady();
-                if (ReadyforQueryG.Equals("yes"))
+                if (ReadyforQueryG)
                 {
                     // Create data table 
                     IList<string> TargetList = new List<string>();
@@ -2347,7 +2359,7 @@ namespace evilsqlclient
                 // Verify query targets have been defined
                 if ((!InstanceG.Equals("")) || (!ConnectionStringG.Equals("")) || (!InstanceAllG.Equals("disabled")))
                 {
-                    ReadyforQueryG = "yes";
+                    ReadyforQueryG = true;
                 }
 
                 return null;
@@ -2389,8 +2401,11 @@ namespace evilsqlclient
             // --------------------------------
             // FUNCTION: RunConsole / Query 
             // --------------------------------
-            public static string RunSQLConsole()
+            public static bool RunSQLConsole(string commandFromCommandLine)
             {
+#if DEBUG
+                Console.WriteLine($"[D] Command: {commandFromCommandLine}");
+#endif
 
                 // Setup columns for discovery table
                 if (MasterDiscoveredList.Columns.Count == 0)
@@ -2423,18 +2438,30 @@ namespace evilsqlclient
 
                 // Read line from the client	
                 Console.Write("SQLCLIENT> ");
-                String MyQuery = Console.ReadLine().ToString();
+
+                bool interactive = true;
+                string MyQuery = string.Empty;
+                if (string.IsNullOrEmpty(commandFromCommandLine))
+                {
+                    MyQuery = Console.ReadLine();
+                }
+                else
+                {
+                    MyQuery = commandFromCommandLine;
+                    interactive = false;
+                    Console.WriteLine(commandFromCommandLine);
+                }
 
                 // Collect multi-line command until "go" is given
                 string fullcommand = "";
-                while (MyQuery.ToLower() != "go")
+                do
                 {
                     fullcommand = fullcommand + "\n" + MyQuery;
 
                     // EXIT IF REQUESTED
                     if (MyQuery.ToLower().Equals("exit") || MyQuery.ToLower().Equals("quit") || MyQuery.ToLower().Equals("bye"))
                     {
-                        return null;
+                        return false;
                     }
 
                     // ----------------------------------------------------
@@ -2695,8 +2722,8 @@ namespace evilsqlclient
                     if (showaccessCheck)
                     {
                         //Call function
-                        ShowAccess(); 
-                        
+                        ShowAccess();
+
                         // Display console
                         Console.Write("\nSQLCLIENT> ");
                     }
@@ -3151,15 +3178,19 @@ namespace evilsqlclient
                         Console.Write("         > ");
                     }
 
-                    // Collect additional query lines						
-                    MyQuery = Console.ReadLine().ToString();
+                    if (interactive)
+                    {
+                        // Collect additional query lines						
+                        MyQuery = Console.ReadLine();
+                    }
                 }
+                while (MyQuery.ToLower() != "go" && interactive);
 
                 // ------------------------------------------------------------
                 //  PERFORM QUERY - SINGLE INSTANCE AND TARGETALL SUPPORTED
                 // ------------------------------------------------------------
                 CheckQueryReady();
-                if (ReadyforQueryG.Equals("yes"))
+                if (ReadyforQueryG)
                 {
                     // Create data table 
                     IList<string> TargetList = new List<string>();
@@ -3402,8 +3433,8 @@ namespace evilsqlclient
                 }
 
                 // Return to console 
-                EvilCommands.RunSQLConsole();
-                return null;
+                // EvilCommands.RunSQLConsole();
+                return true;
             }
         }
     }
