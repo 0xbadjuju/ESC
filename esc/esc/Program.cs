@@ -1,6 +1,6 @@
 ﻿/*
-Author: Scott Sutherland(@_nullbind), NetSPI 2020
-Version: Version: v1.0
+Author: Scott Sutherland(@_nullbind), Alexander Polce Leary (@0xBadJuju), NetSPI 2023
+Version: Version: v1.2
 License: 3-clause BSD
 Description:
 Evil SQL Client(ESC) is an interactive.net SQL console client with enhanced
@@ -46,6 +46,9 @@ namespace evilsqlclient
                  .ToList()
                  .ForEach( j =>
                 {
+#if DEBUG
+                    Console.WriteLine($"[D] Adding: {j}");
+#endif
                     goList.Add(j);
                     if (j.Equals("go", StringComparison.OrdinalIgnoreCase))
                     {
@@ -55,14 +58,22 @@ namespace evilsqlclient
                 });
             });
 
-            try
+            if (0 == allCommands.Count)
             {
-                allCommands.ForEach(k => EvilCommands.RunSQLConsole(k.ToArray()));
+                allCommands.Add(goList);
             }
-            catch (Exception ex)
+
+            allCommands.ForEach(k =>
             {
-                Console.WriteLine(ex.Message);
-            }
+                try
+                { 
+                    EvilCommands.RunSQLConsole(k.ToArray());
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex.Message);
+                }
+            });           
         }
 
         public class EvilCommands
@@ -386,13 +397,15 @@ namespace evilsqlclient
                                                 EvilCommands.MasterDiscoveredList.Rows.Add(instanceName, SamAccountName);
                                             }
                                         }
-                                        catch
+                                        catch (Exception ex)
                                         {
+                                            Console.WriteLine(ex.Message);
                                         }
                                     }
                                 }
-                                catch
+                                catch (Exception ex)
                                 {
+                                    Console.WriteLine(ex.Message);
                                 }
                             }
                         }
