@@ -41,7 +41,14 @@ namespace evilsqlclient
 #endif
                 i.Split(new string[] { "|" }, StringSplitOptions.RemoveEmptyEntries).ToList().ForEach(j =>
                 {
-                    EvilCommands.RunSQLConsole(j.Trim());
+                    try
+                    {
+                        EvilCommands.RunSQLConsole(j.Trim());
+                    }
+                    catch (Exception ex) 
+                    {
+                        Console.WriteLine(ex.Message);
+                    }
                 });
             });
         }
@@ -55,24 +62,24 @@ namespace evilsqlclient
             public static DataTable MasterDiscoveredList = new DataTable();
             public static DataTable MasterAccessList = new DataTable();
             public static string ConnectionStringG = "";
-            public static string InstanceAllG = "disabled";
+            public static bool InstanceAllG = false;
             public static string InstanceG = "";
             public static string UsernameG = "";
             public static string UsertypeG = "CurrentWindowsUser";
             public static string PasswordG = "";
             public static bool ReadyforQueryG = false;
-            public static string ExportFileStateG = "disabled";
+            public static bool ExportFileStateG = false;
             public static string ExportFilePathG = "c:\\windows\\temp\\output.csv";
-            public static string HttpStateG = "disabled";
+            public static bool HttpStateG = false;
             public static string HttpUrlG = "http://127.0.0.1";
-            public static string IcmpStateG = "disabled";
+            public static bool IcmpStateG = false;
             public static string IcmpIpG = "127.0.0.1";
-            public static string EncStateG = "disabled";
+            public static bool EncStateG = false;
             public static string EncKeyG = "AllGoodThings!";
             public static string EncSaltG = "CaptainSalty";
             public static string TimeOutG = "1";
             public static string DiscoveredCountG = "0";
-            public static string VerboseG = "disabled";
+            public static bool VerboseG = false;
             #endregion
 
             // --------------------------------
@@ -2456,106 +2463,66 @@ namespace evilsqlclient
                 string fullcommand = "";
                 do
                 {
+                    bool multiline = false;
+
                     fullcommand = fullcommand + "\n" + MyQuery;
 
                     // EXIT IF REQUESTED
-                    if (MyQuery.ToLower().Equals("exit") || MyQuery.ToLower().Equals("quit") || MyQuery.ToLower().Equals("bye"))
+                    if (MyQuery.Equals("exit", StringComparison.OrdinalIgnoreCase) 
+                        || MyQuery.Equals("quit", StringComparison.OrdinalIgnoreCase) 
+                        || MyQuery.Equals("bye", StringComparison.OrdinalIgnoreCase)
+                    )
                     {
-                        return false;
+                        Environment.Exit(0);
                     }
 
                     // ----------------------------------------------------
                     // CONNECTION SETTINGS 
                     // ----------------------------------------------------
                     #region connection settings
-
-                    // SET CUSTOM CONNECTION STRING  
-                    bool loadCheck = MyQuery.ToLower().Contains("set connstring ");
-                    if (loadCheck)
+                    if (multiline = MyQuery.Check("set connstring "))
                     {
-                        string newcon = MyQuery.Replace("set connstring ", "");
-                        ConnectionStringG = newcon;
+                        ConnectionStringG = MyQuery.Replace("set connstring ", string.Empty);
 
                         // Unset other connection settings 
-                        InstanceAllG = "n";
-                        InstanceG = "";
-                        UsernameG = "";
-                        UsertypeG = "";
-                        PasswordG = "";
+                        InstanceAllG = false;
+                        InstanceG = string.Empty;
+                        UsernameG = string.Empty;
+                        UsertypeG = string.Empty;
+                        PasswordG = string.Empty;
 
-                        // Parse connection string and populate settings
-                        // tbd 
-
-                        // Status user
-                        Console.Write("\nConnection string set to: " + newcon + "\n");
+                        Console.WriteLine($"\nConnection string set to: {ConnectionStringG}");
                         fullcommand = "";
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // SET SINGLE INSTANCE
-                    bool instanceCheck = MyQuery.ToLower().Contains("set instance ");
-                    if (instanceCheck)
+                    else if (multiline = MyQuery.Check("set instance "))
                     {
+                        InstanceG = MyQuery.Replace("set instance ", "");
+                        Console.WriteLine($"\nTarget instance set to: {InstanceG}");
 
-                        // Configure instance 
-                        string newinstance = MyQuery.Replace("set instance ", "");
-                        InstanceG = newinstance;
-                        Console.Write("\nTarget instance set to: " + InstanceG + "\n");
-
-                        // Update connectionstring
                         ConnectionStringG = CreateConnectionString(InstanceG, UsernameG, PasswordG, UsertypeG, "master");
-
-                        // Add instance to discovered list
                         EvilCommands.MasterDiscoveredList.Rows.Add(InstanceG);
-
-                        // Unset InstanceAllG
-                        InstanceAllG = "disabled";
-
-                        // Status user
-                        Console.Write("\nSQLCLIENT> ");
+                        InstanceAllG = false;
                     }
-
-                    // SET ALL DISCOVERED INSTANCES
-                    bool instanceallCheck = MyQuery.ToLower().Contains("set targetall ");
-                    if (instanceallCheck)
+                    else if (multiline = MyQuery.Check("set targetall "))
                     {
-                        string instancestate = MyQuery.Replace("set targetall ", "");
-                        if ((instancestate.Equals("enabled")) || (instancestate.Equals("disabled")))
-                        {
-                            InstanceAllG = instancestate;
-                            InstanceG = "";
-                            if (instancestate.Equals("enabled"))
-                            {
-                                Console.Write("\nEnabled targeting of all discovered instances.\n");
-                            }
-                            else
-                            {
-                                Console.Write("\nDisabled targeting of all discovered instances.\n");
-                            }
-
-                            // Update connectionstring
-                            ConnectionStringG = "";
-
-                        }
-                        else
-                        {
-                            Console.Write("\nValid settings include enabled or disabled.\n");
-                        }
-
-                        Console.Write("\nSQLCLIENT> ");
+                        InstanceAllG = MyQuery.EnableDisable("set targetall ");
+                        Console.WriteLine($"\n{(InstanceAllG ? "Enabled targeting of all discovered instances." : "Disabled targeting of all discovered instances")}");
+                        ConnectionStringG = string.Empty;
+                        InstanceG = string.Empty;
                     }
-
-                    // SET USERNAME
-                    bool usernameCheck = MyQuery.ToLower().Contains("set username ");
-                    if (usernameCheck)
+                    else if (multiline = MyQuery.Check("set username "))
                     {
-                        // Set username	
                         UsernameG = MyQuery.ToLower().Replace("set username ", "");
-                        Console.Write("\nUsername set to: " + UsernameG + "\n");
+                        Console.WriteLine($"\nUsername set to: {UsernameG}");
 
-                        // Update user type Domain or SQL 						
-                        if (UsernameG.ToLower().Contains("\\"))
+                        if (string.IsNullOrEmpty(UsernameG))
                         {
+                            // Set to current windows users if blank
+                            UsertypeG = "CurrentWindowsUser";
+                        }
+                        else if (UsernameG.ToLower().Contains("\\"))
+                        {
+                            // Update user type Domain or SQL 						
                             UsertypeG = "WindowsDomainUser";
                         }
                         else
@@ -2563,112 +2530,61 @@ namespace evilsqlclient
                             UsertypeG = "SqlLogin";
                         }
 
-                        // Set to current windows users if blank
-                        if (UsernameG.Equals(""))
-                        {
-                            UsertypeG = "CurrentWindowsUser";
-                        }
-
-                        // Update connectionstring
                         ConnectionStringG = CreateConnectionString(InstanceG, UsernameG, PasswordG, UsertypeG, "master");
-
-                        // Return to console 
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // SET PASSWORD
-                    bool passwordCheck = MyQuery.Contains("set password ");
-                    if (passwordCheck)
+                    else if (multiline = MyQuery.Check("set password "))
                     {
-
-                        // Set password 
                         PasswordG = MyQuery.Replace("set password ", "");
-                        Console.Write("\nPassword set to: " + PasswordG + "\n");
+                        Console.WriteLine($"\nPassword set to: {PasswordG}");
 
-                        // Update connectionstring
                         ConnectionStringG = CreateConnectionString(InstanceG, UsernameG, PasswordG, UsertypeG, "master");
-
-                        // Return to console
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // SET QUERY TIMEOUT
-                    bool timeoutCheck = MyQuery.Contains("set timeout ");
-                    if (timeoutCheck)
+                    else if (multiline = MyQuery.Check("set timeout "))
                     {
-                        // Set timeout
-                        TimeOutG = MyQuery.ToLower().Replace("set timeout ", "");
-                        Console.Write("\nQuery timeout set to: " + TimeOutG + "\n");
+                        TimeOutG = MyQuery.ToLower().Replace("set timeout ", string.Empty);
+                        Console.WriteLine($"\nQuery timeout set to: {TimeOutG}");
 
-                        // Update connectionstring
                         ConnectionStringG = CreateConnectionString(InstanceG, UsernameG, PasswordG, UsertypeG, "master");
-
-                        // Return to console
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
                     #endregion
 
                     // ----------------------------------------------------
                     // INSTANCE DISCOVERY COMMANDS
                     // ----------------------------------------------------	
                     #region discovery commands				
-
-                    // DISCOVER SQL SERVER INSTANCES VIA BROADCAST REQUEST
-                    bool broadcastCheck = MyQuery.ToLower().Contains("discover broadcast");
-                    if (broadcastCheck)
+                    else if (multiline = MyQuery.Check("discover broadcast"))
                     {
-                        // Call function
                         GetSQLServersBroadCast();
-
-                        // Display console
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // DISCOVER SQL SERVER INSTANCES VIA SERVICE PRINCIPCAL NAMES
-                    bool spnCheck = MyQuery.ToLower().Contains("discover domainspn");
-                    if (spnCheck)
+                    else if (multiline = MyQuery.Check("discover domainspn"))
                     {
-                        // Call function
                         GetSQLServersSpn();
-
-                        // Display console
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // DISCOVER SQL SERVER INSTANCES VIA PROVIDED FILE
-                    bool fileCheck1 = MyQuery.ToLower().Contains("discover file");
-                    if (fileCheck1)
+                    else if (multiline = MyQuery.Check("discover file"))
                     {
-                        // Parse file path
-                        String filePath1 = MyQuery.ToLower();
-                        String parts = filePath1.Split(' ')[2];
+                        string[] filePath1 = MyQuery.ToLower().Split(new string[] { " " }, StringSplitOptions.RemoveEmptyEntries);
 
-                        // Add instance list to discovered
+                        string parts = string.Empty;
+                        if (filePath1.Length > 2)
+                        {
+                            parts = filePath1[2];
+                        }
+
                         GetSQLServerFile(parts);
-
-                        // Display Console
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // SHOW DISCOVERED SQL SERVER INSTANCES
-                    bool showdiscoCheck = MyQuery.ToLower().Contains("show discovered");
-                    if (showdiscoCheck)
+                    else if (multiline = MyQuery.Check("show discovered"))
                     {
-                        // Call function
                         ShowDiscovered();
-
-                        // Display console
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // EXPORT DISCOVERED SQL SERVER INSTANCES TO FILE
-                    bool exportdiscoCheck = MyQuery.ToLower().Contains("export discovered");
-                    if (exportdiscoCheck)
+                    else if (multiline = MyQuery.Check("export discovered"))
                     {
-                        // Parse file path
-                        String filePath1 = MyQuery.ToLower();
-                        String targetPath = filePath1.Split(' ')[2];
+                        string[] filePath1 = MyQuery.ToLower().Split(new string[] { " " }, StringSplitOptions.RemoveEmptyEntries);
+
+                        string targetPath = string.Empty;
+                        if (filePath1.Length > 2)
+                        {
+                            targetPath = filePath1[2];
+                        }
 
                         StringBuilder fileContent = new StringBuilder();
 
@@ -2677,7 +2593,7 @@ namespace evilsqlclient
                             fileContent.Append(col.ToString() + ",");
                         }
 
-                        fileContent.Replace(",", System.Environment.NewLine, fileContent.Length - 1, 1);
+                        fileContent.Replace(",", Environment.NewLine, fileContent.Length - 1, 1);
                         foreach (DataRow dr in EvilCommands.MasterDiscoveredList.Rows)
                         {
                             foreach (var column in dr.ItemArray)
@@ -2691,67 +2607,66 @@ namespace evilsqlclient
                         try
                         {
                             // write file output
-                            System.IO.File.WriteAllText(targetPath, fileContent.ToString());
+                            File.WriteAllText(targetPath, fileContent.ToString());
                             Console.WriteLine("\n" + EvilCommands.MasterDiscoveredList.Rows.Count + " instances were written to " + targetPath);
                         }
                         catch
                         {
                             Console.WriteLine("\nUnable to write file.\n");
                         }
-
-                        // Display console	
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // CLEAR DISCOVERED INSTANCES 
-                    bool cleardiscoCheck = MyQuery.ToLower().Contains("clear discovered");
-                    if (cleardiscoCheck)
+                    else if (multiline = MyQuery.Check("clear discovered"))
                     {
-                        // Remove items
                         EvilCommands.MasterDiscoveredList.Clear();
-
-                        // Status user
                         Console.Write("\nThe list of discovered instances has been cleared.\n");
-
-                        // Display console				
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // SHOW SQL SERVER INSTANCES THAT CAN BE LOGGED INTO
-                    bool showaccessCheck = MyQuery.ToLower().Contains("show access");
-                    if (showaccessCheck)
+                    else if (multiline = MyQuery.Check("show access"))
                     {
-                        //Call function
                         ShowAccess();
-
-                        // Display console
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // EXPORT SQL SERVER INSTANCES THAT CAN BE LOGGED INTO TO FILE
-                    bool exportaccessCheck = MyQuery.ToLower().Contains("export access");
-                    if (exportaccessCheck)
+                    else if (multiline = MyQuery.Check("export access"))
                     {
-                        // Parse file path
-                        String filePath1 = MyQuery.ToLower();
-                        String targetPath = filePath1.Split(' ')[2];
-                        String InstanceOnly = "";
-                        try
+
+                        string[] filePath1 = MyQuery.ToLower().Split(new string[] { " " }, StringSplitOptions.RemoveEmptyEntries);
+
+                        string targetPath = string.Empty;
+                        if (filePath1.Length > 2)
                         {
-                            InstanceOnly = filePath1.Split(' ')[3];
+                            targetPath = filePath1[2];
                         }
-                        catch
+
+                        string InstanceOnly = string.Empty;
+                        if (filePath1.Length > 3)
                         {
-                            InstanceOnly = "";
+                            InstanceOnly = filePath1[3];
                         }
 
                         // Unique the list
                         DataView AccessView = new DataView(EvilCommands.MasterAccessList);
-                        DataTable distinctValues = AccessView.ToTable(true, "Instance", "DomainName", "ServiceProcessID", "ServiceName", "ServiceAccount", "AuthenticationMode", "ForcedEncryption", "Clustered", "SQLServerMajorVersion", "SQLServerVersionNumber", "SQLServerEdition", "SQLServerServicePack", "OSArchitecture", "OsVersionNumber", "CurrentLogin", "CurrentLoginPassword", "IsSysadmin");
+                        DataTable distinctValues = AccessView.ToTable(
+                            true, 
+                            "Instance", 
+                            "DomainName", 
+                            "ServiceProcessID", 
+                            "ServiceName", 
+                            "ServiceAccount", 
+                            "AuthenticationMode", 
+                            "ForcedEncryption", 
+                            "Clustered", 
+                            "SQLServerMajorVersion", 
+                            "SQLServerVersionNumber",
+                            "SQLServerEdition", 
+                            "SQLServerServicePack", 
+                            "OSArchitecture", 
+                            "OsVersionNumber", 
+                            "CurrentLogin", 
+                            "CurrentLoginPassword", 
+                            "IsSysadmin"
+                        );
 
                         StringBuilder fileContent = new StringBuilder();
 
-                        if (InstanceOnly.Equals(""))
+                        if (InstanceOnly.Equals(string.Empty))
                         {
                             // Write headers
                             foreach (var col in distinctValues.Columns)
@@ -2760,7 +2675,7 @@ namespace evilsqlclient
                             }
 
                             // Write Data 
-                            fileContent.Replace(",", System.Environment.NewLine, fileContent.Length - 1, 1);
+                            fileContent.Replace(",", Environment.NewLine, fileContent.Length - 1, 1);
                             foreach (DataRow dr in distinctValues.Rows)
                             {
                                 foreach (var column in dr.ItemArray)
@@ -2768,7 +2683,7 @@ namespace evilsqlclient
                                     fileContent.Append("\"" + column.ToString() + "\",");
                                 }
 
-                                fileContent.Replace(",", System.Environment.NewLine, fileContent.Length - 1, 1);
+                                fileContent.Replace(",", Environment.NewLine, fileContent.Length - 1, 1);
                             }
                         }
 
@@ -2784,349 +2699,148 @@ namespace evilsqlclient
                         try
                         {
                             // write file output
-                            System.IO.File.WriteAllText(targetPath, fileContent.ToString());
+                            File.WriteAllText(targetPath, fileContent.ToString());
                             Console.WriteLine("\n" + EvilCommands.MasterAccessList.Rows.Count + " instances were written to " + targetPath);
                         }
                         catch
                         {
                             Console.WriteLine("\nUnable to write file.\n");
                         }
-
-                        // Display console	
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // CLEAR DISCOVERED INSTANCES 
-                    bool clearaccessCheck = MyQuery.ToLower().Contains("clear access");
-                    if (clearaccessCheck)
+                    else if (multiline = MyQuery.Check("clear access"))
                     {
-                        // Remove items
                         EvilCommands.MasterAccessList.Clear();
-
-                        // Status user
-                        Console.Write("\nThe list of instances that can be logged into has been cleared.\n");
-
-                        // Display console				
-                        Console.Write("\nSQLCLIENT> ");
+                        Console.WriteLine("\nThe list of instances that can be logged into has been cleared.");
                     }
-
                     #endregion
 
                     // ----------------------------------------------------
                     // DATA EXFILTRATION SETTINGS 
                     // ----------------------------------------------------
                     #region data exfiltration settings 
-
-                    // FILE EXFILTRATION: ENABLE/DISABLE
-                    bool fileCheck3 = MyQuery.ToLower().Contains("set file ");
-                    if (fileCheck3)
+                    else if (multiline = MyQuery.Check("set file "))
                     {
-                        string filestate = MyQuery.Replace("set file ", "");
-                        if ((filestate.Equals("enabled")) || (filestate.Equals("disabled")))
-                        {
-                            ExportFileStateG = filestate;
-                            Console.Write("\nExfiltrating query results to a file has been " + filestate + ".\n");
-                            Console.Write("Don't forget to set the filepath setting.\n");
-                        }
-                        else
-                        {
-                            Console.Write("\nValid settings include enabled or disabled.\n");
-                        }
-                        Console.Write("\nSQLCLIENT> ");
+                        ExportFileStateG = MyQuery.EnableDisable("set file ");
+                        Console.WriteLine($"\nExfiltrating query results to a file has been {(ExportFileStateG ? "enabled\nDon't forget to set the filepath setting." : "disabled")} ");
                     }
-
-                    // FILE EXFILTRATION: SET OUTPUT FILE
-                    bool fileCheck = MyQuery.ToLower().Contains("set filepath ");
-                    if (fileCheck)
+                    else if (multiline = MyQuery.Check("set filepath "))
                     {
-                        string newfile = MyQuery.ToLower().Replace("set filepath ", "");
-                        Console.Write("\nQuery results will be exported to " + newfile + ".\n");
-                        ExportFilePathG = newfile;
-                        Console.Write("\nSQLCLIENT> ");
+                        ExportFilePathG = MyQuery.ToLower().Replace("set filepath ", "");
+                        Console.WriteLine($"\nQuery results will be exported to {ExportFilePathG}.");
                     }
-
-                    // ICMP EXFILTRATION: ENABLE/DISABLE
-                    bool icmpenabledCheck = MyQuery.ToLower().Contains("set icmp ");
-                    if (icmpenabledCheck)
+                    else if (multiline = MyQuery.Check("set icmp "))
                     {
-                        string IcmpState = MyQuery.ToLower().Replace("set icmp ", "");
-                        if ((IcmpState.Equals("enabled")) || (IcmpState.Equals("disabled")))
-                        {
-                            IcmpStateG = IcmpState;
-                            Console.Write("\nExfiltrating query results via ICMP has been " + IcmpState + ".\n");
-                            Console.Write("Don't forget to configure the ICMPIP setting.\n");
-                        }
-                        else
-                        {
-                            Console.Write("\nValid settings include enabled or disabled.\n");
-                        }
-                        Console.Write("\nSQLCLIENT> ");
+                        IcmpStateG = MyQuery.EnableDisable("set icmp ");
+                        Console.WriteLine($"\nExfiltrating query results via ICMP has been {(IcmpStateG ? "enabled\nDon't forget to configure the ICMPIP setting." : "disabled")} ");
                     }
-
-                    // ICMP EXFILTRATION: SET IP
-                    bool ipCheck = MyQuery.ToLower().Contains("set icmpip ");
-                    if (ipCheck)
+                    else if (multiline = MyQuery.Check("set icmpip "))
                     {
-                        string targetip = MyQuery.ToLower().Replace("set icmpip ", "");
-                        IcmpIpG = targetip;
-                        Console.Write("\nICMP IP set to " + targetip + ".\n");
-                        Console.Write("\nSQLCLIENT> ");
+                        IcmpIpG = MyQuery.ToLower().Replace("set icmpip ", string.Empty); ;
+                        Console.WriteLine($"\nICMP IP set to {IcmpIpG}.");
                     }
-
-                    // HTTP EXFILTRATION: ENABLE/DISABLE
-                    bool httpenabledCheck = MyQuery.ToLower().Contains("set http ");
-                    if (httpenabledCheck)
+                    else if (multiline = MyQuery.Check("set http "))
                     {
-                        string HttpState = MyQuery.ToLower().Replace("set http ", "");
-                        if ((HttpState.Equals("enabled")) || (HttpState.Equals("disabled")))
-                        {
-                            HttpStateG = HttpState;
-                            Console.Write("\nExfiltrating query results via HTTP POST has been " + HttpState + ".\n");
-                            Console.Write("Don't forget to set the HTTPURL setting.\n");
-                        }
-                        else
-                        {
-                            Console.Write("\nValid settings include enabled or disabled.\n");
-                        }
-                        Console.Write("\nSQLCLIENT> ");
+                        HttpStateG = MyQuery.EnableDisable("set http ");
+                        Console.WriteLine($"\nExfiltrating query results via HTTP POST has been {(HttpStateG ? "enabled\nDon't forget to set the HTTPURL setting." : "disabled")} ");
                     }
-
-                    // HTTP EXFILTRATION: SET URL
-                    bool urlCheck = MyQuery.ToLower().Contains("set httpurl ");
-                    if (urlCheck)
+                    else if (multiline = MyQuery.Check("set httpurl "))
                     {
-                        string targeturl = MyQuery.ToLower().Replace("set httpurl ", "");
-                        HttpUrlG = targeturl;
-                        Console.Write("\nHTTP URL set to " + targeturl + ".\n");
-                        Console.Write("\nSQLCLIENT> ");
+                        HttpUrlG = MyQuery.ToLower().Replace("set httpurl ", string.Empty);
+                        Console.WriteLine($"\nHTTP URL set to {HttpUrlG}.");
                     }
-
                     #endregion
 
                     // ----------------------------------------------------
                     // DATA ENCRYPTION SETTINGS 
                     // ----------------------------------------------------
                     #region data encryption settings 
-
-                    // DATA ENCRYPTION: ENABLE/DISABLE
-                    bool encdisabledCheck = MyQuery.ToLower().Contains("set encryption ");
-                    if (encdisabledCheck)
+                    else if (multiline = MyQuery.Check("set encryption "))
                     {
-                        string encstate = MyQuery.Replace("set encryption ", "");
-                        if ((encstate.Equals("enabled")) || (encstate.Equals("disabled")))
-                        {
-                            EncStateG = encstate;
-                            Console.Write("\nData encryption has been " + encstate + ".\n");
-                            Console.Write("Don't forget update the key and salt.\n");
-                        }
-                        else
-                        {
-                            Console.Write("\nValid settings include enabled or disabled.\n");
-                        }
-                        Console.Write("\nSQLCLIENT> ");
+                        EncStateG = MyQuery.EnableDisable("set Encryption ");
+                        Console.WriteLine($"\nData encryption has been {(EncStateG ? "enabled\nDon't forget update the key and salt." : "disabled")} ");
                     }
-
-                    // DATA ENCRYPTION: SET KEY
-                    bool keyCheck = MyQuery.ToLower().Contains("set enckey ");
-                    if (keyCheck)
+                    else if (multiline = MyQuery.Check("set enckey "))
                     {
-                        string mykey = MyQuery.Replace("set enckey ", "");
-                        EncKeyG = mykey;
-                        Console.Write("\nEncryption key set to: " + mykey + "\n");
-                        Console.Write("\nSQLCLIENT> ");
+                        EncKeyG = MyQuery.Replace("set enckey ", string.Empty);
+                        Console.WriteLine($"\nEncryption key set to: {EncKeyG}");
                     }
-
-                    // DATA ENCRYPTION: SET SALT
-                    bool saltCheck = MyQuery.ToLower().Contains("set encsalt ");
-                    if (saltCheck)
+                    else if (multiline = MyQuery.Check("set encsalt "))
                     {
-                        string mysalt = MyQuery.Replace("set encsalt ", "");
-                        EncSaltG = mysalt;
-                        Console.Write("\nEncryption salt set to: " + mysalt + "\n");
-                        Console.Write("\nSQLCLIENT> ");
+                        EncSaltG = MyQuery.Replace("set encsalt ", string.Empty);
+                        Console.WriteLine($"\nEncryption salt set to: {EncSaltG}");
                     }
-
                     #endregion
 
                     // ----------------------------------------------------
                     // OFFENSIVE COMMANDS 
                     // ----------------------------------------------------
                     #region offensive commands 
-
-                    // CHECK ACCESS 
-                    bool CheckAccessBool = MyQuery.ToLower().Contains("check access");
-                    if (CheckAccessBool)
+                    else if (multiline = MyQuery.Check("check access"))
                     {
-                        // Call function
                         CheckAccess();
-
-                        // Display console
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // CHECK DEFAULT PW FOR KNOWN INSTANCE NAMES
-                    bool CheckDefaultPwBool = MyQuery.ToLower().Contains("check defaultpw");
-                    if (CheckDefaultPwBool)
+                    else if (multiline = MyQuery.Check("check defaultpw"))
                     {
-                        // Call function
                         CheckDefaultAppPw();
-
-                        // Display console
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // LIST DATABASES
-                    bool CheckListDb = MyQuery.ToLower().Contains("list databases");
-                    if (CheckListDb)
+                    else if (multiline = MyQuery.Check("list databases"))
                     {
-                        // Call function
                         ListDatabase();
-
-                        // Display console
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // LIST TABLES
-                    bool CheckListTbl = MyQuery.ToLower().Contains("list tables");
-                    if (CheckListTbl)
+                    else if (multiline = MyQuery.Check("list tables"))
                     {
-                        // Call function
                         ListTable();
-
-                        // Display console
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // LIST SERVER INFORMATION
-                    bool CheckListServerInfo = MyQuery.ToLower().Contains("list serverinfo");
-                    if (CheckListServerInfo)
+                    else if (multiline = MyQuery.Check("list serverinfo"))
                     {
-                        // Call function
                         ListServerInfo();
-
-                        // Display console
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // LIST ROLE MEMBERS
-                    bool CheckRoleMember = MyQuery.ToLower().Contains("list rolemembers");
-                    if (CheckRoleMember)
+                    else if (multiline = MyQuery.Check("list rolemembers"))
                     {
-                        // Call function
                         ListRoleMembers();
-
-                        // Display console
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // LIST LINKS
-                    bool CheckListLink = MyQuery.ToLower().Contains("list links");
-                    if (CheckListLink)
+                    else if (multiline = MyQuery.Check("list links"))
                     {
-                        // Call function
                         ListLinks();
-
-                        // Display console
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // LIST LOGINS
-                    bool CheckListLogin = MyQuery.ToLower().Contains("list logins");
-                    if (CheckListLogin)
+                    else if (multiline = MyQuery.Check("list logins"))
                     {
-                        // Call function
                         ListLogins();
-
-                        // Display console
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // LIST PRIVS
-                    bool CheckListPrivs = MyQuery.ToLower().Contains("list privs");
-                    if (CheckListPrivs)
+                    else if (multiline = MyQuery.Check("list privs"))
                     {
-                        // Call function
                         ListPrivs();
-
-                        // Display console
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // LIST LOGIN AS PASSWORD
-                    bool CheckLoginAsPwBool = MyQuery.ToLower().Contains("check loginaspw");
-                    if (CheckLoginAsPwBool)
+                    else if (multiline = MyQuery.Check("check loginaspw"))
                     {
-                        // Call function
                         CheckLoginAsPw();
-
-                        // Display console
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // CHECK UNC PATH INJECTION
-                    bool CheckUnc = MyQuery.ToLower().Contains("check uncinject ");
-                    if (CheckUnc)
+                    else if (multiline = MyQuery.Check("check uncinject "))
                     {
-                        // Parse attacker IP
-                        string attackerip = MyQuery.Replace("check uncinject ", "");
-
-                        // Call function
-                        CheckUncPathInjection(attackerip);
-
-                        // Display console
-                        Console.Write("\nSQLCLIENT> ");
+                        CheckUncPathInjection(MyQuery.Replace("check uncinject ", string.Empty));
                     }
-
-                    // RUN OSCMD via xp_cmdshell
-                    bool CheckOSCmd = MyQuery.ToLower().Contains("run oscmd ");
-                    if (CheckOSCmd)
+                    else if (multiline = MyQuery.Check("run oscmd "))
                     {
-                        //  Parse command
-                        string command = MyQuery.Replace("run oscmd ", "");
-
-                        // Call function
-                        RunOsCmd(command);
-
-                        // Display console
-                        Console.Write("\nSQLCLIENT> ");
+                        RunOsCmd(MyQuery.Replace("run oscmd ", string.Empty));
                     }
-
                     #endregion
 
                     // ----------------------------------------------------
                     // MISC COMMANDS 
                     // ----------------------------------------------------
                     #region misc commands 
-
-                    // VERBOSE: ENABLE/DISABLE
-                    bool verboseCheck = MyQuery.ToLower().Contains("set verbose ");
-                    if (verboseCheck)
+                    else if (multiline = MyQuery.Check("set verbose"))
                     {
-                        string VerboseState = MyQuery.ToLower().Replace("set verbose ", "");
-                        if ((VerboseState.Equals("enabled")) || (VerboseState.Equals("disabled")))
-                        {
-                            VerboseG = VerboseState;
-                            Console.Write("\nVerbose errors messages have been " + VerboseState + ".\n");
-                        }
-                        else
-                        {
-                            Console.Write("\nValid settings include enabled or disabled.\n");
-                        }
-                        Console.Write("\nSQLCLIENT> ");
+                        VerboseG = MyQuery.EnableDisable("set verbose ");
+                        Console.Write($"\nVerbose errors messages have been {(VerboseG ? "enabled" : "disabled")}.\n");
                     }
-
-                    // CLEAR CONSOLE
-                    if (MyQuery.ToLower().Equals("clear"))
+                    else if (MyQuery.Check("clear"))
                     {
                         Console.Clear();
                         fullcommand = "";
                         Console.WriteLine("----------");
-                        Console.Write("SQLCLIENT> ");
                     }
-
-                    // SHOW SETTINGS 
-                    bool statusCheck = MyQuery.ToLower().Contains("show settings");
-                    if (statusCheck)
+                    else if (multiline = MyQuery.Check("show settings"))
                     {
                         fullcommand = "";
                         Console.WriteLine("\n------------------------------------");
@@ -3156,24 +2870,18 @@ namespace evilsqlclient
                         Console.WriteLine(" EncKey     : " + EncKeyG);
                         Console.WriteLine(" EncSalt    : " + EncSaltG);
                         Console.WriteLine("------------------------------------\n");
-                        Console.Write("SQLCLIENT> ");
+                        // Console.Write("SQLCLIENT> ");
                     }
-
-                    // SHOW HELP
-                    bool helpCheck = MyQuery.ToLower().Contains("help");
-                    if (MyQuery.ToLower().Equals("help") || MyQuery.ToLower().Equals("show help"))
+                    else if (multiline = (MyQuery.Check("help") || MyQuery.Check("show help")))
                     {
-
                         GetHelp();
                         fullcommand = "";
                         Console.WriteLine("----------");
-                        Console.Write("SQLCLIENT> ");
                     }
-
                     #endregion
 
                     // Show multi-line input											
-                    if ((MyQuery.ToLower() != "clear") && (!CheckOSCmd) && (!CheckUnc) && (!CheckListServerInfo) && (!CheckRoleMember) && (!CheckListPrivs) && (!CheckLoginAsPwBool) && (!CheckListLogin) && (!CheckListLink) && (!CheckListTbl) && (!CheckListDb) && (!CheckDefaultPwBool) && (!clearaccessCheck) && (!exportaccessCheck) && (!showaccessCheck) && (!verboseCheck) && (!timeoutCheck) && (!CheckAccessBool) && (!passwordCheck) && (!fileCheck3) && (!cleardiscoCheck) && (!usernameCheck) && (!exportdiscoCheck) && (!instanceCheck) && (!instanceallCheck) && (!showdiscoCheck) && (!broadcastCheck) && (!fileCheck1) && (!spnCheck) && (!encdisabledCheck) && (!urlCheck) && (!keyCheck) && (!saltCheck) && (!ipCheck) && (!loadCheck) && (!fileCheck) && (!helpCheck) && (!httpenabledCheck) && (!icmpenabledCheck) && (!statusCheck))
+                    if ((MyQuery.ToLower() != "clear") && multiline)
                     {
                         Console.Write("         > ");
                     }
@@ -3435,6 +3143,34 @@ namespace evilsqlclient
                 // Return to console 
                 // EvilCommands.RunSQLConsole();
                 return true;
+            }
+        }
+    }
+
+    public static class StringExtention
+    {
+        public static bool Check(this string source, string toCheck)
+        {
+            return source?.IndexOf(toCheck, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        public static bool EnableDisable(this string source, string toCheck)
+        {
+            try
+            {
+                return source.ToLower().Replace(toCheck, string.Empty) switch
+                {
+                    "enabled" => true,
+                    "true" => true,
+                    "disabled" => false,
+                    "false" => false,
+                    _ => throw new Exception("Invalid Setting Specified")
+                };
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                return false;
             }
         }
     }
