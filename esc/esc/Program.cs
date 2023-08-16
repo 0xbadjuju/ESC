@@ -40,23 +40,23 @@ namespace evilsqlclient
             List<string> goList = new List<string>();
 
             args.ToList()
-                .ForEach( i =>
-            {
-                i.Split(new string[] { "|" }, StringSplitOptions.RemoveEmptyEntries)
-                 .ToList()
-                 .ForEach( j =>
+                .ForEach(i =>
                 {
+                    i.Split(new string[] { "|" }, StringSplitOptions.RemoveEmptyEntries)
+                     .ToList()
+                     .ForEach(j =>
+                     {
 #if DEBUG
-                    Console.WriteLine($"[D] Adding: {j}");
+                         Console.WriteLine($"[D] Adding: {j}");
 #endif
-                    goList.Add(j);
-                    if (j.Equals("go", StringComparison.OrdinalIgnoreCase))
-                    {
-                        allCommands.Add(goList);
-                        goList.Clear();
-                    }                    
+                         goList.Add(j);
+                         if (j.Equals("go", StringComparison.OrdinalIgnoreCase))
+                         {
+                             allCommands.Add(goList);
+                             goList.Clear();
+                         }
+                     });
                 });
-            });
 
             if (0 == allCommands.Count)
             {
@@ -66,14 +66,14 @@ namespace evilsqlclient
             allCommands.ForEach(k =>
             {
                 try
-                { 
+                {
                     EvilCommands.RunSQLConsole(k.ToArray());
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine(ex.Message);
                 }
-            });           
+            });
         }
 
         public class EvilCommands
@@ -301,14 +301,17 @@ namespace evilsqlclient
                 }
                 foreach (DataRow row in table.Rows)
                 {
-                    if (row["ServerName"] != DBNull.Value && Environment.MachineName.Equals(row["ServerName"].ToString()))
+#if DEBUG
+                    Console.WriteLine($"[D] {row["ServerName"]}");
+#endif
+                    if (row["ServerName"] != DBNull.Value && !Environment.MachineName.Check($"{row["ServerName"]}"))
                     {
                         string Instance = row["ServerName"].ToString();
                         if (row["InstanceName"] != DBNull.Value || !string.IsNullOrEmpty(Convert.ToString(row["InstanceName"]).Trim()))
                         {
                             Instance += @"\" + Convert.ToString(row["InstanceName"]).Trim();
                         }
-                        EvilCommands.MasterDiscoveredList.Rows.Add(Instance, "");
+                        EvilCommands.MasterDiscoveredList.Rows.Add(Instance, string.Empty);
                         Console.WriteLine(Instance);
                     }
 
@@ -355,7 +358,7 @@ namespace evilsqlclient
                 try
                 {
                     using (DirectorySearcher ds = new DirectorySearcher(RootDirEntry))
-                    {                                            
+                    {
                         ds.Filter = "(servicePrincipalName=*mssql*)";
                         ds.SearchScope = System.DirectoryServices.SearchScope.Subtree;
                         ds.PageSize = 1000;
@@ -1423,19 +1426,19 @@ namespace evilsqlclient
                 string columnValue = "";
                 string spaces = "";
                 int tabNumber = 1;
-                DataRow[] currentRows = EvilCommands.MasterDiscoveredList.Select(null, null, DataViewRowState.CurrentRows);
-                if (currentRows.Length > 1)
+                DataRow[] currentRows = MasterDiscoveredList.Select(null, null, DataViewRowState.CurrentRows);
+                if (currentRows.Length > 0)
                 {
                     // Display columns.
                     Console.WriteLine("\n");
-                    foreach (DataColumn column in EvilCommands.MasterDiscoveredList.Columns)
+                    foreach (DataColumn column in MasterDiscoveredList.Columns)
                     {
                         // Pad column
                         columnValue = column.ColumnName.ToString();
                         if (columnValue.Length < linewidth)
                         {
                             tabNumber = linewidth - columnValue.Length;
-                            spaces = new String(' ', tabNumber);
+                            spaces = new string(' ', tabNumber);
                         }
                         else
                         {
@@ -1450,14 +1453,20 @@ namespace evilsqlclient
                     // Display rows
                     foreach (DataRow row in currentRows)
                     {
-                        foreach (DataColumn column in EvilCommands.MasterDiscoveredList.Columns)
+#if DEBUG
+                        Console.WriteLine($"[D] {row}");
+#endif
+                        foreach (DataColumn column in MasterDiscoveredList.Columns)
                         {
+#if DEBUG
+                            Console.WriteLine($"[D] {column}");
+#endif
                             // Pad column to 50 characters
                             columnValue = row[column].ToString();
                             if (columnValue.Length < linewidth)
                             {
                                 tabNumber = linewidth - columnValue.Length;
-                                spaces = new String(' ', tabNumber);
+                                spaces = new string(' ', tabNumber);
                             }
                             else
                             {
@@ -1467,10 +1476,10 @@ namespace evilsqlclient
                             Console.Write(row[column] + spaces);
                         }
                         Console.WriteLine("\t");
-                    }                    
+                    }
                 }
 
-                Console.WriteLine("\n" + EvilCommands.MasterDiscoveredList.Rows.Count + " instances found.");
+                Console.WriteLine($"\n{MasterDiscoveredList.Rows.Count} instances found.");
                 return null;
             }
 
@@ -2435,7 +2444,7 @@ namespace evilsqlclient
             {
                 // Setup columns for discovery table
                 if (MasterDiscoveredList.Columns.Count == 0)
-                {                    
+                {
                     MasterDiscoveredList.Columns.Add("Instance");
                     MasterDiscoveredList.Columns.Add("SamAccountName");
                 }
@@ -2461,7 +2470,7 @@ namespace evilsqlclient
                     MasterAccessList.Columns.Add("IsSysadmin");
                     MasterAccessList.Columns.Add("CurrentLoginPassword");
                 }
-                
+
                 // Collect multi-line command until "go" is given         
                 string MyQuery = string.Empty;
                 string fullcommand = string.Empty;
