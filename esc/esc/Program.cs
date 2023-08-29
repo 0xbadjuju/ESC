@@ -29,10 +29,12 @@ namespace evilsqlclient
 {
     public class Program
     {
-        public static void Main(string[] args)
+        public void Main(string[] args)
         {
+            EvilCommands ec = new EvilCommands();
+
             // Run console
-            if (0 == args.Length) { while (EvilCommands.RunSQLConsole(null)) { } }
+            if (0 == args.Length) { while (ec.RunSQLConsole(null)) { } }
 
 
 
@@ -67,7 +69,7 @@ namespace evilsqlclient
             {
                 try
                 {
-                    EvilCommands.RunSQLConsole(k.ToArray());
+                    ec.RunSQLConsole(k.ToArray());
                 }
                 catch (Exception ex)
                 {
@@ -82,27 +84,27 @@ namespace evilsqlclient
             // GLOBAL OBJECTS
             // --------------------------------	
             #region globalobjects
-            public static DataTable MasterDiscoveredList = new DataTable();
-            public static DataTable MasterAccessList = new DataTable();
-            public static string ConnectionStringG = "";
-            public static bool InstanceAllG = false;
-            public static string InstanceG = "";
-            public static string UsernameG = "";
-            public static string UsertypeG = "CurrentWindowsUser";
-            public static string PasswordG = "";
-            public static bool ReadyforQueryG = false;
-            public static bool ExportFileStateG = false;
-            public static string ExportFilePathG = "c:\\windows\\temp\\output.csv";
-            public static bool HttpStateG = false;
-            public static string HttpUrlG = "http://127.0.0.1";
-            public static bool IcmpStateG = false;
-            public static string IcmpIpG = "127.0.0.1";
-            public static bool EncStateG = false;
-            public static string EncKeyG = "AllGoodThings!";
-            public static string EncSaltG = "CaptainSalty";
-            public static string TimeOutG = "1";
-            public static string DiscoveredCountG = "0";
-            public static bool VerboseG = false;
+            public DataTable MasterDiscoveredList = new DataTable();
+            public DataTable MasterAccessList = new DataTable();
+            public string ConnectionStringG = "";
+            public bool InstanceAllG = false;
+            public string InstanceG = "";
+            public string UsernameG = "";
+            public string UsertypeG = "CurrentWindowsUser";
+            public string PasswordG = "";
+            public bool ReadyforQueryG = false;
+            public bool ExportFileStateG = false;
+            public string ExportFilePathG = "c:\\windows\\temp\\output.csv";
+            public bool HttpStateG = false;
+            public string HttpUrlG = "http://127.0.0.1";
+            public bool IcmpStateG = false;
+            public string IcmpIpG = "127.0.0.1";
+            public bool EncStateG = false;
+            public string EncKeyG = "AllGoodThings!";
+            public string EncSaltG = "CaptainSalty";
+            public string TimeOutG = "1";
+            public string DiscoveredCountG = "0";
+            public bool VerboseG = false;
             #endregion
 
             // --------------------------------
@@ -113,7 +115,7 @@ namespace evilsqlclient
             // --------------------------------
             // FUNCTION: GetHelp
             // --------------------------------		
-            public static string GetHelp()
+            public string GetHelp()
             {
                 string help = @"
     -----------------------------------------------------------------------------------------
@@ -248,7 +250,7 @@ namespace evilsqlclient
             // --------------------------------
             // FUNCTION: GetSQLServerFile
             // --------------------------------
-            public static string GetSQLServerFile(string filePath)
+            public string GetSQLServerFile(string filePath)
             {
                 // Status
                 Console.WriteLine("\nReading file " + filePath + "\n");
@@ -268,7 +270,7 @@ namespace evilsqlclient
                     Instance = tr.ReadLine();
                     while (Instance != null)
                     {
-                        EvilCommands.MasterDiscoveredList.Rows.Add(Instance, "");
+                        MasterDiscoveredList.Rows.Add(Instance, "");
                         Console.WriteLine(Instance);
                         Instance = tr.ReadLine();
                     }
@@ -289,7 +291,7 @@ namespace evilsqlclient
             // --------------------------------
             // FUNCTION: GetSQLServersBroadCast
             // --------------------------------
-            public static string GetSQLServersBroadCast()
+            public string GetSQLServersBroadCast()
             {
                 Console.WriteLine("\nSending a broadcast request to identify SQL Server instances.\n");
                 SqlDataSourceEnumerator instance = SqlDataSourceEnumerator.Instance;
@@ -311,7 +313,7 @@ namespace evilsqlclient
                         {
                             Instance += @"\" + Convert.ToString(row["InstanceName"]).Trim();
                         }
-                        EvilCommands.MasterDiscoveredList.Rows.Add(Instance, string.Empty);
+                        MasterDiscoveredList.Rows.Add(Instance, string.Empty);
                         Console.WriteLine(Instance);
                     }
 
@@ -333,7 +335,7 @@ namespace evilsqlclient
             // --------------------------------
             // FUNCTION: GetSQLServersSpn
             // --------------------------------
-            public static string GetSQLServersSpn()
+            public string GetSQLServersSpn()
             {
                 // Create data table to store and display output
                 DataTable mytable = new DataTable();
@@ -397,7 +399,7 @@ namespace evilsqlclient
                                             if (ServiceType.ToLower().Contains("mssql"))
                                             {
                                                 mytable.Rows.Add(new object[] { instanceName, SamAccountName });
-                                                EvilCommands.MasterDiscoveredList.Rows.Add(instanceName, SamAccountName);
+                                                MasterDiscoveredList.Rows.Add(instanceName, SamAccountName);
                                             }
                                         }
                                         catch (Exception ex)
@@ -482,9 +484,8 @@ namespace evilsqlclient
             // --------------------------------
             // FUNCTION: EncryptStringAES
             // --------------------------------
-            // Set salt - May not want the salt to be static long term :P
-            private static byte[] _salt = Encoding.Unicode.GetBytes(EncSaltG);
-            public static string EncryptStringAES(string plainText, string sharedSecret)
+            // Set salt - May not want the salt to be long term :P
+            public string EncryptStringAES(string plainText, string sharedSecret)
             {
                 if (string.IsNullOrEmpty(plainText))
                     throw new ArgumentNullException("plainText");
@@ -497,7 +498,7 @@ namespace evilsqlclient
                 try
                 {
                     // generate the key from the shared secret and the salt
-                    Rfc2898DeriveBytes key = new Rfc2898DeriveBytes(sharedSecret, _salt);
+                    Rfc2898DeriveBytes key = new Rfc2898DeriveBytes(sharedSecret, Encoding.Unicode.GetBytes(EncSaltG));
 
                     // Create a RijndaelManaged object
                     aesAlg = new RijndaelManaged();
@@ -538,7 +539,7 @@ namespace evilsqlclient
             // --------------------------------
             // FUNCTION: DecryptStringAES
             // --------------------------------
-            public static string DecryptStringAES(string cipherText, string sharedSecret)
+            public string DecryptStringAES(string cipherText, string sharedSecret)
             {
                 if (string.IsNullOrEmpty(cipherText))
                     throw new ArgumentNullException("cipherText");
@@ -556,7 +557,7 @@ namespace evilsqlclient
                 try
                 {
                     // generate the key from the shared secret and the salt
-                    Rfc2898DeriveBytes key = new Rfc2898DeriveBytes(sharedSecret, _salt);
+                    Rfc2898DeriveBytes key = new Rfc2898DeriveBytes(sharedSecret, Encoding.Unicode.GetBytes(EncSaltG));
 
                     // Create the streams used for decryption.                
                     byte[] bytes = Convert.FromBase64String(cipherText);
@@ -595,7 +596,7 @@ namespace evilsqlclient
             // --------------------------------
             // FUNCTION: ReadByteArray
             // --------------------------------
-            private static byte[] ReadByteArray(Stream s)
+            private byte[] ReadByteArray(Stream s)
             {
                 byte[] rawLength = new byte[sizeof(int)];
                 if (s.Read(rawLength, 0, rawLength.Length) != rawLength.Length)
@@ -615,7 +616,7 @@ namespace evilsqlclient
             // ------------------------------------------------------------
             // FUNCTION: LISTDATABASE
             // ------------------------------------------------------------
-            public static string ListDatabase()
+            public string ListDatabase()
             {
                 CheckQueryReady();
                 if (ReadyforQueryG)
@@ -625,7 +626,7 @@ namespace evilsqlclient
 
                     // Add all
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/	
-                    DataView AccessView = new DataView(EvilCommands.MasterAccessList);
+                    DataView AccessView = new DataView(MasterAccessList);
                     DataTable distinctValues = AccessView.ToTable(true, "Instance");
                     if (InstanceAllG)
                     {
@@ -731,7 +732,7 @@ namespace evilsqlclient
             // ------------------------------------------------------------
             // FUNCTION: LISTTABLE
             // ------------------------------------------------------------
-            public static string ListTable()
+            public string ListTable()
             {
                 CheckQueryReady();
                 if (ReadyforQueryG)
@@ -741,7 +742,7 @@ namespace evilsqlclient
 
                     // Add all
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/	
-                    DataView AccessView = new DataView(EvilCommands.MasterAccessList);
+                    DataView AccessView = new DataView(MasterAccessList);
                     DataTable distinctValues = AccessView.ToTable(true, "Instance");
                     if (InstanceAllG)
                     {
@@ -854,7 +855,7 @@ namespace evilsqlclient
             // ------------------------------------------------------------
             // FUNCTION: LISTLINKS
             // ------------------------------------------------------------
-            public static string ListLinks()
+            public string ListLinks()
             {
                 CheckQueryReady();
                 if (ReadyforQueryG)
@@ -866,7 +867,7 @@ namespace evilsqlclient
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/	
                     // Add all
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/
-                    DataView AccessView = new DataView(EvilCommands.MasterAccessList);
+                    DataView AccessView = new DataView(MasterAccessList);
                     DataTable distinctValues = AccessView.ToTable(true, "Instance");
                     if (InstanceAllG)
                     {
@@ -975,7 +976,7 @@ namespace evilsqlclient
             // ------------------------------------------------------------
             // FUNCTION: CHECKUNCPATHINJECTION
             // ------------------------------------------------------------
-            public static string CheckUncPathInjection(string attackerip)
+            public string CheckUncPathInjection(string attackerip)
             {
                 CheckQueryReady();
                 if (ReadyforQueryG)
@@ -987,7 +988,7 @@ namespace evilsqlclient
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/	
                     // Add all
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/
-                    DataView AccessView = new DataView(EvilCommands.MasterAccessList);
+                    DataView AccessView = new DataView(MasterAccessList);
                     DataTable distinctValues = AccessView.ToTable(true, "Instance");
                     if (InstanceAllG)
                     {
@@ -1052,7 +1053,7 @@ namespace evilsqlclient
             // ------------------------------------------------------------
             // FUNCTION: LISTPROLEMEMBER
             // ------------------------------------------------------------
-            public static string ListRoleMembers()
+            public string ListRoleMembers()
             {
                 CheckQueryReady();
                 if (ReadyforQueryG)
@@ -1064,7 +1065,7 @@ namespace evilsqlclient
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/	
                     // Add all
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/
-                    DataView AccessView = new DataView(EvilCommands.MasterAccessList);
+                    DataView AccessView = new DataView(MasterAccessList);
                     DataTable distinctValues = AccessView.ToTable(true, "Instance");
                     if (InstanceAllG)
                     {
@@ -1147,7 +1148,7 @@ namespace evilsqlclient
             // ------------------------------------------------------------
             // FUNCTION: LISTPRIVS
             // ------------------------------------------------------------
-            public static string ListPrivs()
+            public string ListPrivs()
             {
                 CheckQueryReady();
                 if (ReadyforQueryG)
@@ -1159,7 +1160,7 @@ namespace evilsqlclient
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/	
                     // Add all
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/
-                    DataView AccessView = new DataView(EvilCommands.MasterAccessList);
+                    DataView AccessView = new DataView(MasterAccessList);
                     DataTable distinctValues = AccessView.ToTable(true, "Instance");
                     if (InstanceAllG)
                     {
@@ -1258,7 +1259,7 @@ namespace evilsqlclient
             // ------------------------------------------------------------
             // FUNCTION: LISTSERVERINFO
             // ------------------------------------------------------------
-            public static string ListServerInfo()
+            public string ListServerInfo()
             {
                 CheckQueryReady();
                 if (ReadyforQueryG)
@@ -1268,7 +1269,7 @@ namespace evilsqlclient
 
                     // Add all
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/									   
-                    DataView AccessView = new DataView(EvilCommands.MasterAccessList);
+                    DataView AccessView = new DataView(MasterAccessList);
                     DataTable distinctValues = AccessView.ToTable(true, "Instance");
                     if (InstanceAllG)
                     {
@@ -1419,7 +1420,7 @@ namespace evilsqlclient
             // ------------------------------------------------------------
             // FUNCTION: SHOWDISCOVERED
             // ------------------------------------------------------------
-            public static string ShowDiscovered()
+            public string ShowDiscovered()
             {
                 // Display output of data table
                 int linewidth = 50;
@@ -1486,10 +1487,10 @@ namespace evilsqlclient
             // ------------------------------------------------------------
             // FUNCTION: SHOWACCESS
             // ------------------------------------------------------------
-            public static string ShowAccess()
+            public string ShowAccess()
             {
                 // Unique the list
-                DataView AccessView = new DataView(EvilCommands.MasterAccessList);
+                DataView AccessView = new DataView(MasterAccessList);
                 DataTable distinctValues = AccessView.ToTable(true, "Instance", "DomainName", "ServiceProcessID", "ServiceName", "ServiceAccount", "AuthenticationMode", "ForcedEncryption", "Clustered", "SQLServerMajorVersion", "SQLServerVersionNumber", "SQLServerEdition", "SQLServerServicePack", "OSArchitecture", "OsVersionNumber", "CurrentLogin", "CurrentLoginPassword", "IsSysadmin");
 
                 // Display the list 
@@ -1526,7 +1527,7 @@ namespace evilsqlclient
             // ------------------------------------------------------------
             // FUNCTION: CHECKLOGINASPW
             // ------------------------------------------------------------
-            public static string CheckLoginAsPw()
+            public string CheckLoginAsPw()
             {
                 CheckQueryReady();
                 if (ReadyforQueryG)
@@ -1536,7 +1537,7 @@ namespace evilsqlclient
 
                     // Add all
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/
-                    DataView AccessView = new DataView(EvilCommands.MasterAccessList);
+                    DataView AccessView = new DataView(MasterAccessList);
                     DataTable distinctValues = AccessView.ToTable(true, "Instance");
                     if (InstanceAllG)
                     {
@@ -1686,7 +1687,7 @@ namespace evilsqlclient
                                     // Add to access list
                                     foreach (DataRow CurrentRow in LoginInfo.Select())
                                     {
-                                        EvilCommands.MasterAccessList.Rows.Add(CurrentRow["Instance"].ToString(), CurrentRow["DomainName"].ToString(), CurrentRow["ServiceProcessID"].ToString(), CurrentRow["ServiceName"].ToString(), CurrentRow["ServiceAccount"].ToString(), CurrentRow["AuthenticationMode"].ToString(), CurrentRow["ForcedEncryption"].ToString(), CurrentRow["Clustered"].ToString(), CurrentRow["SQLServerMajorVersion"].ToString(), CurrentRow["SQLServerVersionNumber"].ToString(), CurrentRow["SQLServerEdition"].ToString(), CurrentRow["SQLServerServicePack"].ToString(), CurrentRow["OSArchitecture"].ToString(), CurrentRow["OsVersionNumber"].ToString(), CurrentRow["Currentlogin"].ToString(), CurrentRow["IsSysadmin"].ToString(), CurrentRow["Currentlogin"].ToString());
+                                        MasterAccessList.Rows.Add(CurrentRow["Instance"].ToString(), CurrentRow["DomainName"].ToString(), CurrentRow["ServiceProcessID"].ToString(), CurrentRow["ServiceName"].ToString(), CurrentRow["ServiceAccount"].ToString(), CurrentRow["AuthenticationMode"].ToString(), CurrentRow["ForcedEncryption"].ToString(), CurrentRow["Clustered"].ToString(), CurrentRow["SQLServerMajorVersion"].ToString(), CurrentRow["SQLServerVersionNumber"].ToString(), CurrentRow["SQLServerEdition"].ToString(), CurrentRow["SQLServerServicePack"].ToString(), CurrentRow["OSArchitecture"].ToString(), CurrentRow["OsVersionNumber"].ToString(), CurrentRow["Currentlogin"].ToString(), CurrentRow["IsSysadmin"].ToString(), CurrentRow["Currentlogin"].ToString());
                                     }
 
                                 }
@@ -1717,7 +1718,7 @@ namespace evilsqlclient
             // ------------------------------------------------------------
             // FUNCTION: LISTLOGINS
             // ------------------------------------------------------------	
-            public static string ListLogins()
+            public string ListLogins()
             {
                 CheckQueryReady();
                 if (ReadyforQueryG)
@@ -1727,7 +1728,7 @@ namespace evilsqlclient
 
                     // Add all
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/
-                    DataView AccessView = new DataView(EvilCommands.MasterAccessList);
+                    DataView AccessView = new DataView(MasterAccessList);
                     DataTable distinctValues = AccessView.ToTable(true, "Instance");
                     if (InstanceAllG)
                     {
@@ -1812,7 +1813,7 @@ namespace evilsqlclient
             // ------------------------------------------------------------
             // FUNCTION: CHECKACCESS 
             // ------------------------------------------------------------
-            public static string CheckAccess()
+            public string CheckAccess()
             {
                 CheckQueryReady();
                 if (ReadyforQueryG)
@@ -1824,7 +1825,7 @@ namespace evilsqlclient
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/									   
                     if (InstanceAllG)
                     {
-                        foreach (DataRow CurrentRecord in EvilCommands.MasterDiscoveredList.Select())
+                        foreach (DataRow CurrentRecord in MasterDiscoveredList.Select())
                         {
                             TargetList.Add(CurrentRecord["Instance"].ToString());
                         }
@@ -1837,7 +1838,7 @@ namespace evilsqlclient
                     }
 
                     // Get list count
-                    var count = EvilCommands.MasterDiscoveredList.Rows.Count;
+                    var count = MasterDiscoveredList.Rows.Count;
                     int countAccessible = 0;
                     Console.WriteLine("\n" + count + " instances will be targeted.");
 
@@ -1947,7 +1948,7 @@ namespace evilsqlclient
                                 Console.WriteLine("Login is Sysadmin    : " + CurrentRecord["IsSysadmin"].ToString());
 
                                 // Add to access list								
-                                EvilCommands.MasterAccessList.Rows.Add(CurrentRecord["Instance"].ToString(), CurrentRecord["DomainName"].ToString(), CurrentRecord["ServiceProcessID"].ToString(), CurrentRecord["ServiceName"].ToString(), CurrentRecord["ServiceAccount"].ToString(), CurrentRecord["AuthenticationMode"].ToString(), CurrentRecord["ForcedEncryption"].ToString(), CurrentRecord["Clustered"].ToString(), CurrentRecord["SQLServerMajorVersion"].ToString(), CurrentRecord["SQLServerVersionNumber"].ToString(), CurrentRecord["SQLServerEdition"].ToString(), CurrentRecord["SQLServerServicePack"].ToString(), CurrentRecord["OSArchitecture"].ToString(), CurrentRecord["OsVersionNumber"].ToString(), CurrentRecord["CurrentLogin"].ToString(), CurrentRecord["IsSysadmin"].ToString(), PasswordG);
+                                MasterAccessList.Rows.Add(CurrentRecord["Instance"].ToString(), CurrentRecord["DomainName"].ToString(), CurrentRecord["ServiceProcessID"].ToString(), CurrentRecord["ServiceName"].ToString(), CurrentRecord["ServiceAccount"].ToString(), CurrentRecord["AuthenticationMode"].ToString(), CurrentRecord["ForcedEncryption"].ToString(), CurrentRecord["Clustered"].ToString(), CurrentRecord["SQLServerMajorVersion"].ToString(), CurrentRecord["SQLServerVersionNumber"].ToString(), CurrentRecord["SQLServerEdition"].ToString(), CurrentRecord["SQLServerServicePack"].ToString(), CurrentRecord["OSArchitecture"].ToString(), CurrentRecord["OsVersionNumber"].ToString(), CurrentRecord["CurrentLogin"].ToString(), CurrentRecord["IsSysadmin"].ToString(), PasswordG);
 
                                 // Add to count
                                 countAccessible = countAccessible + 1;
@@ -1974,7 +1975,7 @@ namespace evilsqlclient
             // ------------------------------------------------------------
             // FUNCTION: CHECKDEFAULTAPPPW 
             // ------------------------------------------------------------
-            public static string CheckDefaultAppPw()
+            public string CheckDefaultAppPw()
             {
                 CheckQueryReady();
                 if (ReadyforQueryG)
@@ -1986,7 +1987,7 @@ namespace evilsqlclient
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/									   
                     if (InstanceAllG)
                     {
-                        foreach (DataRow CurrentRecord in EvilCommands.MasterDiscoveredList.Select())
+                        foreach (DataRow CurrentRecord in MasterDiscoveredList.Select())
                         {
                             TargetList.Add(CurrentRecord["Instance"].ToString());
                         }
@@ -2206,7 +2207,7 @@ namespace evilsqlclient
                                             Console.WriteLine("Login is Sysadmin    : " + CurrentRecord["IsSysadmin"].ToString());
 
                                             // Add to access list
-                                            EvilCommands.MasterAccessList.Rows.Add(CurrentRecord["Instance"].ToString(), CurrentRecord["DomainName"].ToString(), CurrentRecord["ServiceProcessID"].ToString(), CurrentRecord["ServiceName"].ToString(), CurrentRecord["ServiceAccount"].ToString(), CurrentRecord["AuthenticationMode"].ToString(), CurrentRecord["ForcedEncryption"].ToString(), CurrentRecord["Clustered"].ToString(), CurrentRecord["SQLServerMajorVersion"].ToString(), CurrentRecord["SQLServerVersionNumber"].ToString(), CurrentRecord["SQLServerEdition"].ToString(), CurrentRecord["SQLServerServicePack"].ToString(), CurrentRecord["OSArchitecture"].ToString(), CurrentRecord["OsVersionNumber"].ToString(), CurrentRecord["CurrentLogin"].ToString(), CurrentRecord["IsSysadmin"].ToString(), DefaultPassword);
+                                            MasterAccessList.Rows.Add(CurrentRecord["Instance"].ToString(), CurrentRecord["DomainName"].ToString(), CurrentRecord["ServiceProcessID"].ToString(), CurrentRecord["ServiceName"].ToString(), CurrentRecord["ServiceAccount"].ToString(), CurrentRecord["AuthenticationMode"].ToString(), CurrentRecord["ForcedEncryption"].ToString(), CurrentRecord["Clustered"].ToString(), CurrentRecord["SQLServerMajorVersion"].ToString(), CurrentRecord["SQLServerVersionNumber"].ToString(), CurrentRecord["SQLServerEdition"].ToString(), CurrentRecord["SQLServerServicePack"].ToString(), CurrentRecord["OSArchitecture"].ToString(), CurrentRecord["OsVersionNumber"].ToString(), CurrentRecord["CurrentLogin"].ToString(), CurrentRecord["IsSysadmin"].ToString(), DefaultPassword);
 
                                             // Add to passwords found count 
                                             guessCount = guessCount + 1;
@@ -2236,7 +2237,7 @@ namespace evilsqlclient
             // ------------------------------------------------------------
             // FUNCTION: RUNOSCMD
             // ------------------------------------------------------------
-            public static string RunOsCmd(string command)
+            public string RunOsCmd(string command)
             {
                 CheckQueryReady();
                 if (ReadyforQueryG)
@@ -2246,7 +2247,7 @@ namespace evilsqlclient
 
                     // Add all
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/	
-                    DataView AccessView = new DataView(EvilCommands.MasterAccessList);
+                    DataView AccessView = new DataView(MasterAccessList);
                     DataTable distinctValues = AccessView.ToTable(true, "Instance");
                     if (InstanceAllG)
                     {
@@ -2395,7 +2396,7 @@ namespace evilsqlclient
             // --------------------------------
             //  FUNCTION: CheckQueryReady
             // --------------------------------
-            public static string CheckQueryReady()
+            public string CheckQueryReady()
             {
                 // Verify query targets have been defined
                 if ((!ConnectionStringG.Equals("")) || InstanceAllG)
@@ -2409,7 +2410,7 @@ namespace evilsqlclient
             // --------------------------------
             // FUNCTION: CreateConnectionString
             // --------------------------------
-            public static string CreateConnectionString(string instance, string username, string password, string usertype, string database)
+            public string CreateConnectionString(string instance, string username, string password, string usertype, string database)
             {
                 // Seting empty connection string 
                 string connectionString = "";
@@ -2440,7 +2441,7 @@ namespace evilsqlclient
             // --------------------------------
             // FUNCTION: RunConsole / Query 
             // --------------------------------
-            public static bool RunSQLConsole(string[] commandFromCommandLine)
+            public bool RunSQLConsole(string[] commandFromCommandLine)
             {
                 // Setup columns for discovery table
                 if (MasterDiscoveredList.Columns.Count == 0)
@@ -2542,7 +2543,7 @@ namespace evilsqlclient
                         Console.WriteLine($"\nTarget instance set to: {InstanceG}");
 
                         ConnectionStringG = CreateConnectionString(InstanceG, UsernameG, PasswordG, UsertypeG, "master");
-                        EvilCommands.MasterDiscoveredList.Rows.Add(InstanceG);
+                        MasterDiscoveredList.Rows.Add(InstanceG);
                         InstanceAllG = false;
                     }
                     else if (multiline = MyQuery.Check("set targetall "))
@@ -2575,6 +2576,13 @@ namespace evilsqlclient
                         ConnectionStringG = CreateConnectionString(InstanceG, UsernameG, PasswordG, UsertypeG, "master");
                     }
                     else if (multiline = MyQuery.Check("set password "))
+                    {
+                        PasswordG = MyQuery.Replace("set password ", "");
+                        Console.WriteLine($"\nPassword set to: {PasswordG}");
+
+                        ConnectionStringG = CreateConnectionString(InstanceG, UsernameG, PasswordG, UsertypeG, "master");
+                    }
+                    else if (multiline = MyQuery.Check("set passlist "))
                     {
                         PasswordG = MyQuery.Replace("set password ", "");
                         Console.WriteLine($"\nPassword set to: {PasswordG}");
@@ -2630,13 +2638,13 @@ namespace evilsqlclient
 
                         StringBuilder fileContent = new StringBuilder();
 
-                        foreach (var col in EvilCommands.MasterDiscoveredList.Columns)
+                        foreach (var col in MasterDiscoveredList.Columns)
                         {
                             fileContent.Append(col.ToString() + ",");
                         }
 
                         fileContent.Replace(",", Environment.NewLine, fileContent.Length - 1, 1);
-                        foreach (DataRow dr in EvilCommands.MasterDiscoveredList.Rows)
+                        foreach (DataRow dr in MasterDiscoveredList.Rows)
                         {
                             foreach (var column in dr.ItemArray)
                             {
@@ -2650,7 +2658,7 @@ namespace evilsqlclient
                         {
                             // write file output
                             File.WriteAllText(targetPath, fileContent.ToString());
-                            Console.WriteLine("\n" + EvilCommands.MasterDiscoveredList.Rows.Count + " instances were written to " + targetPath);
+                            Console.WriteLine("\n" + MasterDiscoveredList.Rows.Count + " instances were written to " + targetPath);
                         }
                         catch
                         {
@@ -2659,7 +2667,7 @@ namespace evilsqlclient
                     }
                     else if (multiline = MyQuery.Check("clear discovered"))
                     {
-                        EvilCommands.MasterDiscoveredList.Clear();
+                        MasterDiscoveredList.Clear();
                         Console.Write("\nThe list of discovered instances has been cleared.\n");
                     }
                     else if (multiline = MyQuery.Check("show access"))
@@ -2684,7 +2692,7 @@ namespace evilsqlclient
                         }
 
                         // Unique the list
-                        DataView AccessView = new DataView(EvilCommands.MasterAccessList);
+                        DataView AccessView = new DataView(MasterAccessList);
                         DataTable distinctValues = AccessView.ToTable(
                             true,
                             "Instance",
@@ -2742,7 +2750,7 @@ namespace evilsqlclient
                         {
                             // write file output
                             File.WriteAllText(targetPath, fileContent.ToString());
-                            Console.WriteLine("\n" + EvilCommands.MasterAccessList.Rows.Count + " instances were written to " + targetPath);
+                            Console.WriteLine("\n" + MasterAccessList.Rows.Count + " instances were written to " + targetPath);
                         }
                         catch
                         {
@@ -2751,7 +2759,7 @@ namespace evilsqlclient
                     }
                     else if (multiline = MyQuery.Check("clear access"))
                     {
-                        EvilCommands.MasterAccessList.Clear();
+                        MasterAccessList.Clear();
                         Console.WriteLine("\nThe list of instances that can be logged into has been cleared.");
                     }
                     #endregion
@@ -2948,7 +2956,7 @@ namespace evilsqlclient
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/									   
                     if (InstanceAllG)
                     {
-                        foreach (DataRow CurrentRecord in EvilCommands.MasterAccessList.Select())
+                        foreach (DataRow CurrentRecord in MasterAccessList.Select())
                         {
                             TargetList.Add(CurrentRecord["Instance"].ToString());
                         }
@@ -3173,7 +3181,7 @@ namespace evilsqlclient
                 }
 
                 // Return to console 
-                // EvilCommands.RunSQLConsole();
+                // RunSQLConsole();
                 return true;
             }
         }
