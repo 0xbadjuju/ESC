@@ -93,7 +93,7 @@ namespace evilsqlclient
             private bool InstanceAllG = false;
             private string InstanceG = "";
             private string UsernameG = "";
-            private string UsertypeG = "CurrentWindowsUser";
+            private UserType UsertypeG = UserType.CurrentWindowsUser;
             private string PasswordG = "";
             private string[] PassList;
             private bool ReadyforQueryG = false;
@@ -1603,7 +1603,7 @@ namespace evilsqlclient
                                 {
 
                                     // Define connection string 
-                                    string ConnectionStringLogin = CreateConnectionString(instance, CurrentRecord["PrincipalName"].ToString(), CurrentRecord["PrincipalName"].ToString(), "SqlLogin", "master");
+                                    string ConnectionStringLogin = CreateConnectionString(instance, CurrentRecord["PrincipalName"].ToString(), CurrentRecord["PrincipalName"].ToString(), UserType.SqlLogin, "master");
 
                                     // Define server info query
                                     string ServerInfoQuery = @"
@@ -1802,7 +1802,7 @@ namespace evilsqlclient
                 foreach (string password in PassList)
                 {
                     Console.WriteLine($"\n{instance}: ATTEMPTING LOGIN with Username: {UsernameG} Password: {password}");
-                    SqlConnection conn = new SqlConnection(CreateConnectionString(instance, UsernameG, password, "SqlLogin", "master"));
+                    SqlConnection conn = new SqlConnection(CreateConnectionString(instance, UsernameG, password, UsertypeG, "master"));
                     SqlCommand QueryCommand = new SqlCommand(fullcommand, conn);
 
                     if (!OpenConnection(conn, instance))
@@ -2267,7 +2267,7 @@ namespace evilsqlclient
                                     try
                                     {
                                         // Setup connection string
-                                        string ConnectionString = CreateConnectionString(instance, DefaultUsername, DefaultPassword, "SqlLogin", "master");
+                                        string ConnectionString = CreateConnectionString(instance, DefaultUsername, DefaultPassword, UserType.SqlLogin, "master");
 
                                         // Execute query							
                                         string fullcommand = @"
@@ -2611,31 +2611,15 @@ namespace evilsqlclient
             // --------------------------------
             // FUNCTION: CreateConnectionString
             // --------------------------------
-            public string CreateConnectionString(string instance, string username, string password, string usertype, string database)
+            private string CreateConnectionString(string instance, string username, string password, UserType usertype, string database)
             {
-                // Seting empty connection string 
-                string connectionString = "";
-
-                // Create current Windows user 
-                if (usertype.Equals("CurrentWindowsUser"))
+                return usertype switch
                 {
-                    connectionString = "Server=" + instance + ";Database=" + database + ";Integrated Security=SSPI;Connection Timeout=" + TimeOutG + ";";
-                }
-
-                // Create Windows Domain user string
-                if (usertype.Equals("WindowsDomainUser"))
-                {
-                    // connectionString = "Server=" + instance + ";Database=" + database + ";Integrated Security=SSPI;Connection Timeout=1" + TimeOutG + ";uid=" + username + ";pwd=" + password + ";";
-                    connectionString = "Server=" + instance + ";Database=" + database + ";Persist Security Info=True;Connection Timeout=1" + TimeOutG + ";uid=" + username + ";pwd=" + password + ";";
-                }
-
-                // Create SQL Login string
-                if (usertype.Equals("SqlLogin"))
-                {
-                    connectionString = "Server=" + instance + ";Database=" + database + ";Connection Timeout=" + TimeOutG + ";User ID=" + username + ";pwd=" + password + ";";
-                }
-
-                return connectionString;
+                    UserType.CurrentWindowsUser => $"Server={instance};Database={database};Integrated Security=SSPI;Connection Timeout={TimeOutG};",
+                    UserType.WindowsDomainUser =>  $"Server={instance};Database={database};Persist Security Info=True;Connection Timeout={TimeOutG};uid={username};pwd={password};",
+                    UserType.SqlLogin =>           $"Server={instance};Database={database};Connection Timeout={TimeOutG};User ID={username};pwd={password};",
+                    _ => throw new InvalidDataException()
+                };
             }
             #endregion commonfunctions
 
@@ -2732,7 +2716,7 @@ namespace evilsqlclient
                         InstanceAllG = false;
                         InstanceG = string.Empty;
                         UsernameG = string.Empty;
-                        UsertypeG = string.Empty;
+                        UsertypeG = UserType.CurrentWindowsUser;
                         PasswordG = string.Empty;
 
                         Console.WriteLine($"\nConnection string set to: {ConnectionStringG}");
@@ -2762,16 +2746,16 @@ namespace evilsqlclient
                         if (string.IsNullOrEmpty(UsernameG))
                         {
                             // Set to current windows users if blank
-                            UsertypeG = "CurrentWindowsUser";
+                            UsertypeG = UserType.CurrentWindowsUser;
                         }
                         else if (UsernameG.ToLower().Contains("\\"))
                         {
                             // Update user type Domain or SQL 						
-                            UsertypeG = "WindowsDomainUser";
+                            UsertypeG = UserType.WindowsDomainUser;
                         }
                         else
                         {
-                            UsertypeG = "SqlLogin";
+                            UsertypeG = UserType.SqlLogin;
                         }
 
                         ConnectionStringG = CreateConnectionString(InstanceG, UsernameG, PasswordG, UsertypeG, "master");
@@ -2785,10 +2769,8 @@ namespace evilsqlclient
                     }
                     else if (multiline = MyQuery.Check("set passlist "))
                     {
-                        PassList = MyQuery.Replace("set password ", "").Split(new string[] { "," }, StringSplitOptions.RemoveEmptyEntries);
+                        PassList = MyQuery.Replace("set passlist ", "").Split(new string[] { "," }, StringSplitOptions.RemoveEmptyEntries);
                         Console.WriteLine($"\nPassword List set to: {PassList.Length} entries");
-
-                        ConnectionStringG = CreateConnectionString(InstanceG, UsernameG, PasswordG, UsertypeG, "master");
                     }
                     else if (multiline = MyQuery.Check("set timeout "))
                     {
@@ -3389,6 +3371,13 @@ namespace evilsqlclient
                 // RunSQLConsole();
                 return true;
             }
+        }
+
+        private enum UserType
+        {
+            CurrentWindowsUser = 1,
+            WindowsDomainUser = 2,
+            SqlLogin = 3
         }
 
         private sealed class AccessInfo
