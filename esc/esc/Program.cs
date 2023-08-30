@@ -1725,7 +1725,7 @@ namespace evilsqlclient
             /// <param name="instance"></param>
             /// <param name="username"></param>
             /// <param name="passwords"></param>
-            public void CheckLoginPwList(string instance)
+            public void CheckLoginPwList()
             {
                 CheckQueryReady();
                 if (!ReadyforQueryG)
@@ -1801,11 +1801,15 @@ namespace evilsqlclient
 
                 foreach (string password in PassList)
                 {
-                    Console.WriteLine($"\n{instance}: ATTEMPTING LOGIN with Username: {UsernameG} Password: {password}");
-                    SqlConnection conn = new SqlConnection(CreateConnectionString(instance, UsernameG, password, UsertypeG, "master"));
+                    Console.WriteLine($"\n{InstanceG}: ATTEMPTING LOGIN with Username: {UsernameG} Password: {password}");
+                    string connectionString = CreateConnectionString(InstanceG, UsernameG, password, UsertypeG, "master");
+#if DEBUG
+                    Console.WriteLine(connectionString);
+#endif
+                    SqlConnection conn = new SqlConnection(connectionString);
                     SqlCommand QueryCommand = new SqlCommand(fullcommand, conn);
 
-                    if (!OpenConnection(conn, instance))
+                    if (!OpenConnection(conn, InstanceG))
                     {
                         return;
                     }
@@ -1864,7 +1868,7 @@ namespace evilsqlclient
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"{instance}: QUERY FAILED");
+                        Console.WriteLine($"{InstanceG}: QUERY FAILED");
                         if (VerboseG)
                         {
                             Console.WriteLine();
@@ -3018,7 +3022,7 @@ namespace evilsqlclient
                     }
                     else if (multiline = MyQuery.Check("check bruteforce"))
                     {
-                        CheckLoginPwList(MyQuery.ToLower().Replace("check bruteforce ", ""));
+                        CheckLoginPwList();
                     }
                     else if (multiline = MyQuery.Check("list databases"))
                     {
