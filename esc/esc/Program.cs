@@ -1811,7 +1811,7 @@ namespace evilsqlclient
 
                     if (!OpenConnection(conn, InstanceG))
                     {
-                        return;
+                        continue;
                     }
 
                     try
@@ -3415,10 +3415,7 @@ namespace evilsqlclient
                 ServiceName = currentRecord["ServiceName"].ToString();
                 ServiceAccount = currentRecord["ServiceAccount"].ToString();
                 AuthenticationMode = currentRecord["AuthenticationMode"].ToString();
-                if (bool.TryParse(currentRecord["ForcedEncryption"].ToString(), out bool forcedEncryption))
-                {
-                    ForcedEncryption = forcedEncryption;
-                }
+                ForcedEncryption = Convert.ToBoolean((int)currentRecord["ForcedEncryption"]);
                 if (bool.TryParse(currentRecord["Clustered"].ToString(), out bool clustered))
                 {
                     Clustered = clustered;
@@ -3430,10 +3427,7 @@ namespace evilsqlclient
                 OSArchitecture = currentRecord["OSArchitecture"].ToString();
                 OsVersionNumber = currentRecord["OsVersionNumber"].ToString();
                 CurrentLogin = currentRecord["CurrentLogin"].ToString();
-                if (bool.TryParse(currentRecord["IsSysadmin"].ToString(), out bool isSysadmin))
-                {
-                    IsSysadmin = isSysadmin;
-                }
+                IsSysadmin = Convert.ToBoolean((int)currentRecord["IsSysadmin"]);
             }
         }
     }
