@@ -1859,6 +1859,8 @@ namespace evilsqlclient
                             
                             AccessList.Add(new AccessInfo(CurrentRecord) { CurrentLoginPassword = password });
                         }
+
+                        return;
                     }
                     catch (Exception ex)
                     {
