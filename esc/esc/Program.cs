@@ -1801,7 +1801,7 @@ namespace evilsqlclient
 
                 foreach (string password in PassList)
                 {
-                    Console.WriteLine($"\n{InstanceG}: ATTEMPTING LOGIN with Username: {UsernameG} Password: {password}");
+                    Console.WriteLine($"\n{InstanceG}: ATTEMPTING LOGIN with Username: \"{UsernameG}\" Password: \"{password}\"");
                     string connectionString = CreateConnectionString(InstanceG, UsernameG, password, UsertypeG, "master");
 #if DEBUG
                     Console.WriteLine(connectionString);
