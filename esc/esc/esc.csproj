@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <!-- Allow building as either EXE (default) or Library via BuildAsLibrary property -->
-    <TargetFramework>net461</TargetFramework>
+    <TargetFramework>net472</TargetFramework>
     <AssemblyName>esc</AssemblyName>
     <RootNamespace>esc</RootNamespace>
     <LangVersion>latest</LangVersion>
